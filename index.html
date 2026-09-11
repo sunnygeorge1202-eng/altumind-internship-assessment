@@ -17,6 +17,9 @@
     --amber:#A8763A;
     --red:#A34A3C;
     --card:#FFFFFF;
+    --marigold:#DFA51E;
+    --teal:#1F6F63;
+    --clay:#B85C38;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -152,7 +155,7 @@
   .qmeta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
   .qtag{font-size:12px;font-weight:600;color:var(--sage-dark);letter-spacing:0.01em;}
   .qtimer{font-size:12px;color:var(--slate);font-variant-numeric:tabular-nums;}
-  .prompt{font-size:17px;line-height:1.6;margin:14px 0 22px;color:var(--ink);}
+  .prompt{font-size:17px;line-height:1.6;margin:14px 0 22px;color:var(--ink);user-select:none;-webkit-user-select:none;}
 
   video, .video-preview{width:100%;border-radius:4px;background:#111;margin-bottom:14px;}
   .rec-status{font-size:13px;color:var(--red);font-weight:600;margin-bottom:10px;display:none;}
@@ -166,6 +169,41 @@
   }
   .final-note{text-align:center;padding:60px 0;}
   a.plain{color:var(--sage-dark);}
+
+  /* ---- landing hero (candidate-facing, warmer than the test screens) ---- */
+  .hero{
+    background:linear-gradient(155deg, #FCF6E8 0%, var(--paper) 55%);
+    border-bottom:1px solid var(--line);
+    padding:56px 24px 40px;
+  }
+  .hero-inner{max-width:640px;margin:0 auto;}
+  .hero-mark{
+    font-family:'Source Serif 4',serif;font-weight:700;font-size:14px;
+    letter-spacing:0.03em;color:var(--teal);margin-bottom:22px;
+  }
+  .hero h1{
+    font-size:38px;line-height:1.15;margin-bottom:14px;
+    opacity:0;animation:heroIn 0.7s ease-out 0.1s forwards;
+  }
+  .hero .sub{
+    font-size:17px;color:var(--slate);max-width:480px;margin-bottom:22px;
+    opacity:0;animation:heroIn 0.7s ease-out 0.25s forwards;
+  }
+  .pills{display:flex;gap:10px;flex-wrap:wrap;opacity:0;animation:heroIn 0.7s ease-out 0.4s forwards;}
+  .pill{
+    font-size:13px;font-weight:600;padding:7px 14px;border-radius:20px;
+    display:inline-flex;align-items:center;gap:7px;background:var(--card);
+    border:1px solid var(--line);color:var(--ink);
+  }
+  .pill .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  @keyframes heroIn{
+    from{opacity:0;transform:translateY(10px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .hero h1, .hero .sub, .pills{animation:none;opacity:1;}
+  }
+  .form-wrap{max-width:640px;margin:0 auto;padding:32px 24px 80px;}
 </style>
 </head>
 <body>
@@ -301,7 +339,14 @@ let state = {
   qTimerStart:null,       // ms timestamp when current question view started
   mediaRecorder:null,
   recordedChunks:[],
-  recStartTime:null
+  recStartTime:null,
+  location:null,          // {lat,lng,source,city,region}
+  sessionActive:false,    // true once the timed session has started, until it ends
+  integrityTriggered:false,
+  doneReason:null,
+  heartbeatHandle:null,
+  listenersAttached:false,
+  ignoreFocusUntil:0
 };
 
 /* ============================================================
@@ -350,6 +395,21 @@ function sendToBackend(payload){
   }).catch(err=>console.warn("Save failed, will retry on final submit", err));
 }
 
+// Authoritative one-attempt-per-session check against the backend. Returns true if this
+// candidate has already started (or completed) this session, per the Sessions sheet.
+async function checkAttemptUsed(email, session){
+  if(ENDPOINT_URL.indexOf("REPLACE_WITH") === 0) return false; // can't check before backend is configured
+  try{
+    const url = ENDPOINT_URL + "?action=check_attempt&email=" + encodeURIComponent(email) + "&session=" + encodeURIComponent(session);
+    const res = await fetch(url);
+    const data = await res.json();
+    return !!(data && data.alreadyUsed);
+  }catch(err){
+    console.warn("Attempt check failed, allowing candidate through:", err);
+    return false; // fail open rather than blocking a legitimate candidate on a network hiccup
+  }
+}
+
 function blobToBase64(blob){
   return new Promise((resolve,reject)=>{
     const reader = new FileReader();
@@ -358,6 +418,104 @@ function blobToBase64(blob){
     reader.readAsDataURL(blob);
   });
 }
+
+/* ============================================================
+   LOCATION — GPS with IP fallback. Consent is required before this runs.
+   ============================================================ */
+async function captureLocation(){
+  const gpsResult = await tryGPS();
+  if(gpsResult){ state.location = gpsResult; return; }
+  const ipResult = await tryIPLookup();
+  state.location = ipResult || {lat:null, lng:null, source:"unavailable"};
+}
+
+function tryGPS(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){ resolve(null); return; }
+    const timer = setTimeout(()=>resolve(null), 6000);
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        clearTimeout(timer);
+        resolve({lat:pos.coords.latitude, lng:pos.coords.longitude, source:"gps", accuracyM:pos.coords.accuracy});
+      },
+      ()=>{ clearTimeout(timer); resolve(null); },
+      {timeout:5500, maximumAge:60000}
+    );
+  });
+}
+
+async function tryIPLookup(){
+  try{
+    const res = await fetch("https://ipapi.co/json/");
+    if(!res.ok) return null;
+    const d = await res.json();
+    return {lat:d.latitude, lng:d.longitude, source:"ip", city:d.city, region:d.region};
+  }catch(err){
+    return null;
+  }
+}
+
+/* ============================================================
+   HEARTBEAT — periodic ping while a timed session is active, so the
+   admin live-map shows who is currently logged in and roughly where.
+   ============================================================ */
+function startHeartbeat(){
+  if(state.heartbeatHandle) clearInterval(state.heartbeatHandle);
+  const ping = ()=>{
+    sendToBackend({
+      type:"heartbeat",
+      session:state.session,
+      candidate:state.candidate,
+      location:state.location,
+      currentQuestionId:state.currentQid,
+      timestamp:new Date().toISOString()
+    });
+  };
+  ping();
+  state.heartbeatHandle = setInterval(ping, 20000);
+}
+
+function stopHeartbeat(){
+  if(state.heartbeatHandle) clearInterval(state.heartbeatHandle);
+  state.heartbeatHandle = null;
+}
+
+/* ============================================================
+   INTEGRITY MONITORING — copy/paste disabled, tab/window-switch ends
+   the session. Best-effort: browser APIs can detect a tab switch or a
+   new tab/window in the same browser reliably, but cannot detect e.g.
+   a second physical monitor being viewed.
+   ============================================================ */
+function attachIntegrityListeners(){
+  if(state.listenersAttached) return;
+  state.listenersAttached = true;
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("blur", onWindowBlur);
+}
+
+function onVisibilityChange(){
+  if(document.hidden && state.sessionActive && state.screen!=="done"){
+    triggerIntegrityViolation("tab_hidden");
+  }
+}
+
+function onWindowBlur(){
+  if(Date.now() < state.ignoreFocusUntil) return;
+  if(state.sessionActive && state.screen!=="done"){
+    triggerIntegrityViolation("window_blur");
+  }
+}
+
+function triggerIntegrityViolation(reason){
+  if(state.integrityTriggered) return;
+  state.integrityTriggered = true;
+  autoSubmitAllAndEnd(reason);
+}
+
+// Block copy / cut / paste / right-click everywhere, for the life of the page.
+["copy","cut","paste","contextmenu"].forEach(evt=>{
+  document.addEventListener(evt, e=>{ e.preventDefault(); return false; });
+});
 
 /* ============================================================
    RENDER ROUTER
@@ -376,10 +534,20 @@ function render(){
 /* ---------- LANDING ---------- */
 function renderLanding(){
   return `
-  <div class="screen">
-    <div class="eyebrow">Altumind Internship Screening</div>
-    <h1>Round 1 Assessment</h1>
-    <p class="lede">This assessment is split into two independent sessions. You can complete them in separate sittings — this link works for either.</p>
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-mark">Altumind</div>
+      <h1>Show us how you think.</h1>
+      <p class="sub">This is round one — a chance to think out loud on real problems from the products you'd actually be working on. No trick questions, just how you reason.</p>
+      <div class="pills">
+        <span class="pill"><span class="dot" style="background:var(--clay)"></span>Clinexia.AI</span>
+        <span class="pill"><span class="dot" style="background:var(--teal)"></span>Merxflo</span>
+        <span class="pill"><span class="dot" style="background:var(--sage)"></span>Dronafy</span>
+      </div>
+    </div>
+  </div>
+  <div class="form-wrap">
+    <p class="lede">This assessment is split into two independent sessions. You can complete them in separate sittings — this link works for either. <strong>Each session can only be started once</strong>, so make sure you're ready before you begin.</p>
     <div class="card">
       <label for="fname">Full name</label>
       <input type="text" id="fname" value="${state.candidate.name}">
@@ -388,9 +556,10 @@ function renderLanding(){
       <label for="fsession">Which session are you starting?</label>
       <select id="fsession">
         <option value="">Select a session</option>
-        <option value="session1">Session 1 — Quantitative Ability &amp; Communication (90 min)</option>
+        <option value="session1">Session 1 — Quantitative Ability &amp; Communication (60 min)</option>
         <option value="session2">Session 2 — Behavioral Competencies (60 min)</option>
       </select>
+      <div id="landingError" style="display:none;" class="locked-note"></div>
       <div class="btn-row">
         <button class="btn-primary" id="btnStart">Continue</button>
       </div>
@@ -438,7 +607,13 @@ function renderInstructions(){
       — You may hit <strong>Review</strong> to save your progress and move to another question, then return to finish it later — your time on that question keeps accumulating across visits.<br>
       — Once you hit <strong>Submit</strong> on a question, it is locked and cannot be revisited.<br>
       — If the session timer runs out, all remaining answers are submitted automatically as they stand.<br>
+      — Copy and paste are disabled for the duration of the assessment.<br>
+      — Opening another browser tab or window, or switching away from this tab, will end the session immediately and submit your answers as they stand at that point.<br>
       ${state.session==="session1" ? "— This session mixes quick objective (multiple-choice) and written questions, plus one short video response (up to 90 seconds). Your browser will ask for camera and microphone permission for that question." : ""}</p>
+      <label class="checkbox-row" style="margin-top:10px;">
+        <input type="checkbox" id="consentCheck">
+        <span class="role-label">I understand and agree that this assessment will collect my approximate location and monitor tab/window focus for integrity purposes while the session is active.</span>
+      </label>
       <div class="btn-row">
         <button class="btn-secondary" id="btnBack">Back</button>
         <button class="btn-primary" id="btnBeginSession">Start session</button>
@@ -529,11 +704,20 @@ function renderQuestion(){
 
 /* ---------- DONE ---------- */
 function renderDone(){
+  let heading = "Session complete";
+  let message = "Your responses for this session have been recorded. You can close this window now.";
+  if(state.doneReason==="tab_hidden" || state.doneReason==="window_blur"){
+    heading = "Assessment ended";
+    message = "This session was ended automatically because another browser tab or window was opened, or you navigated away from this tab. Your answers were submitted as they stood at that moment.";
+  } else if(state.doneReason==="time_limit"){
+    heading = "Time's up";
+    message = "The session timer reached zero, so your remaining answers were submitted automatically as they stood.";
+  }
   return `
   <div class="screen">
     <div class="final-note">
-      <h1>Session complete</h1>
-      <p>Your responses for this session have been recorded. You can close this window now.</p>
+      <h1>${heading}</h1>
+      <p>${message}</p>
       <p class="hint">If you have another session to complete, reopen this link.</p>
     </div>
   </div>`;
@@ -546,11 +730,34 @@ function bindEvents(){
   const $ = id => document.getElementById(id);
 
   if(state.screen==="landing"){
-    $("btnStart").onclick = ()=>{
+    $("btnStart").onclick = async ()=>{
       const name = $("fname").value.trim();
       const email = $("femail").value.trim();
       const session = $("fsession").value;
+      const errEl = $("landingError");
+      errEl.style.display = "none";
       if(!name || !email || !session){ alert("Please fill in your name, email, and select a session."); return; }
+
+      const localKey = "altumind_attempt_" + session + "_" + email.toLowerCase();
+      if(localStorage.getItem(localKey)){
+        errEl.textContent = "You've already used your attempt for this session on this device. If you believe this is an error, contact Altumind.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      $("btnStart").disabled = true;
+      $("btnStart").textContent = "Checking...";
+      const already = await checkAttemptUsed(email, session);
+      $("btnStart").disabled = false;
+      $("btnStart").textContent = "Continue";
+
+      if(already){
+        localStorage.setItem(localKey, "1");
+        errEl.textContent = "This session has already been started or completed for this email. Each session can only be attempted once. If you believe this is an error, contact Altumind.";
+        errEl.style.display = "block";
+        return;
+      }
+
       state.candidate = {name, email};
       state.session = session;
       if(session==="session2"){
@@ -580,12 +787,23 @@ function bindEvents(){
       state.screen = state.session==="session2" ? "roles" : "landing";
       render();
     };
-    $("btnBeginSession").onclick = ()=>{
+    $("btnBeginSession").onclick = async ()=>{
+      const consent = $("consentCheck");
+      if(!consent || !consent.checked){ alert("Please check the consent box to continue."); return; }
+      $("btnBeginSession").disabled = true;
+      $("btnBeginSession").textContent = "Starting...";
+      await captureLocation();
+      localStorage.setItem("altumind_attempt_" + state.session + "_" + state.candidate.email.toLowerCase(), "1");
       state.globalTimeLeft = SESSION_TIME_LIMITS[state.session];
       startGlobalTimer();
+      state.sessionActive = true;
+      state.integrityTriggered = false;
+      attachIntegrityListeners();
+      startHeartbeat();
       sendToBackend({
         type:"session_start", session:state.session, candidate:state.candidate,
         roles:state.selectedRoles, questionIds:state.questions.map(q=>q.id),
+        location: state.location,
         timestamp:new Date().toISOString()
       });
       state.screen = "map";
@@ -746,6 +964,9 @@ function resumeAfterCancelledSubmit(qid){
 
 function finishSession(){
   if(state.globalTimerHandle) clearInterval(state.globalTimerHandle);
+  state.sessionActive = false;
+  stopHeartbeat();
+  state.doneReason = "completed";
   sendToBackend({
     type:"session_complete",
     session:state.session,
@@ -756,7 +977,12 @@ function finishSession(){
   render();
 }
 
-function autoSubmitAllAndEnd(){
+function autoSubmitAllAndEnd(reason){
+  reason = reason || "time_limit";
+  if(state.globalTimerHandle) clearInterval(state.globalTimerHandle);
+  state.sessionActive = false;
+  stopHeartbeat();
+  state.doneReason = reason;
   // lock in whatever is on screen for the current question, then force-submit every unsubmitted question with current draft state
   const qid = state.currentQid;
   if(qid && state.screen==="question"){
@@ -786,6 +1012,7 @@ function autoSubmitAllAndEnd(){
         isCorrect: (q.type==="mcq" && a.selectedOption!==undefined) ? (a.selectedOption===q.correctIndex) : null,
         videoBase64:null,
         timeSpentSec:Math.round(a.timeSpent||0),
+        reason: reason,
         timestamp:new Date().toISOString()
       });
     }
@@ -793,6 +1020,7 @@ function autoSubmitAllAndEnd(){
   sendToBackend({
     type:"session_complete_autotimeout",
     session:state.session, candidate:state.candidate,
+    reason: reason,
     timestamp:new Date().toISOString()
   });
   state.screen = "done";
@@ -805,6 +1033,7 @@ function autoSubmitAllAndEnd(){
 async function startRecording(){
   const qid = state.currentQid;
   try{
+    state.ignoreFocusUntil = Date.now() + 6000; // permission dialogs can blur the window
     const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
     const previewEl = document.getElementById("preview");
     previewEl.srcObject = stream;
