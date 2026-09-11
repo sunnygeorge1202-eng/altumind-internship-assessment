@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Altumind Assessment — Live Candidates</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{ --paper:#FAFAF8; --ink:#1D211D; --slate:#565F58; --sage:#5E7C5A; --sage-dark:#456142; --line:#DEDBD0; --card:#fff; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--paper);color:var(--ink);}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  header h1{font-size:16px;margin:0;}
+  header .count{font-size:13px;color:var(--slate);}
+  #map{height:calc(100vh - 53px);width:100%;}
+  .gate{max-width:420px;margin:80px auto;padding:28px;background:var(--card);border:1px solid var(--line);border-radius:6px;}
+  .gate input{width:100%;padding:10px;margin:10px 0;border:1px solid var(--line);border-radius:4px;}
+  .gate button{width:100%;padding:10px;background:var(--sage-dark);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;}
+  .hint{font-size:13px;color:var(--slate);}
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <h3>Live candidate map</h3>
+  <p class="hint">Enter your Apps Script Web App URL and admin key (set as ADMIN_KEY in backend.gs).</p>
+  <input type="text" id="endpointInput" placeholder="https://script.google.com/macros/s/.../exec">
+  <input type="text" id="keyInput" placeholder="Admin key">
+  <button id="btnConnect">Connect</button>
+</div>
+
+<div id="dashboard" style="display:none;">
+  <header>
+    <h1>Altumind Assessment — Live Candidates</h1>
+    <div class="count" id="countLabel">0 currently active</div>
+  </header>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let ENDPOINT = localStorage.getItem("altumind_admin_endpoint") || "";
+let KEY = localStorage.getItem("altumind_admin_key") || "";
+let map, markersLayer;
+let pollHandle;
+
+document.getElementById("endpointInput").value = ENDPOINT;
+document.getElementById("keyInput").value = KEY;
+
+if(ENDPOINT && KEY){ connect(); }
+
+document.getElementById("btnConnect").onclick = ()=>{
+  ENDPOINT = document.getElementById("endpointInput").value.trim();
+  KEY = document.getElementById("keyInput").value.trim();
+  if(!ENDPOINT || !KEY){ alert("Enter both the Web App URL and the admin key."); return; }
+  localStorage.setItem("altumind_admin_endpoint", ENDPOINT);
+  localStorage.setItem("altumind_admin_key", KEY);
+  connect();
+};
+
+function connect(){
+  document.getElementById("gate").style.display = "none";
+  document.getElementById("dashboard").style.display = "block";
+  map = L.map("map").setView([20.5937, 78.9629], 5); // default: India
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  markersLayer = L.layerGroup().addTo(map);
+  poll();
+  pollHandle = setInterval(poll, 15000);
+}
+
+async function poll(){
+  try{
+    const url = ENDPOINT + "?action=live&key=" + encodeURIComponent(KEY);
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data.ok){
+      document.getElementById("countLabel").textContent = "Error: " + (data.error || "unknown");
+      return;
+    }
+    renderCandidates(data.candidates || []);
+  }catch(err){
+    document.getElementById("countLabel").textContent = "Connection error — retrying...";
+  }
+}
+
+function renderCandidates(candidates){
+  markersLayer.clearLayers();
+  document.getElementById("countLabel").textContent = candidates.length + " currently active";
+
+  candidates.forEach(c=>{
+    if(c.lat === "" || c.lng === "" || c.lat == null || c.lng == null) return;
+    const marker = L.circleMarker([parseFloat(c.lat), parseFloat(c.lng)], {
+      radius:9, color:"#456142", fillColor:"#5E7C5A", fillOpacity:0.85, weight:2
+    });
+    const lastSeen = new Date(c.lastSeen);
+    const secsAgo = Math.round((Date.now() - lastSeen.getTime())/1000);
+    marker.bindPopup(
+      "<strong>" + escapeHtml(c.name || "Unknown") + "</strong><br>" +
+      escapeHtml(c.email || "") + "<br>" +
+      "Session: " + escapeHtml(c.session || "") + "<br>" +
+      "Current question: " + escapeHtml(c.currentQuestion || "-") + "<br>" +
+      "Location source: " + escapeHtml(c.locationSource || "-") +
+      (c.city ? " (" + escapeHtml(c.city) + (c.region ? ", " + escapeHtml(c.region) : "") + ")" : "") + "<br>" +
+      "Last seen: " + secsAgo + "s ago"
+    );
+    marker.addTo(markersLayer);
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+</script>
+</body>
+</html>
