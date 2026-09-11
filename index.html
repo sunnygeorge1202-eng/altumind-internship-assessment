@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Altumind Internship Assessment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAFAF8;
+    --ink:#1D211D;
+    --slate:#565F58;
+    --sage:#5E7C5A;
+    --sage-dark:#456142;
+    --line:#DEDBD0;
+    --amber:#A8763A;
+    --red:#A34A3C;
+    --card:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{
+    font-family:'Source Serif 4',serif;
+    font-weight:600;
+    margin:0 0 0.4em 0;
+    color:var(--ink);
+  }
+  .screen{
+    max-width:640px;
+    margin:0 auto;
+    padding:48px 24px 80px;
+    min-height:100vh;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:32px;
+  }
+  .eyebrow{
+    color:var(--sage-dark);
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    margin-bottom:10px;
+  }
+  p{margin:0 0 1em 0;color:var(--slate);}
+  .lede{font-size:16px;color:var(--slate);}
+  label{display:block;font-weight:500;font-size:14px;margin-bottom:6px;color:var(--ink);}
+  input[type=text], input[type=email], textarea, select{
+    width:100%;
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    padding:11px 12px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:var(--paper);
+    color:var(--ink);
+    margin-bottom:18px;
+  }
+  textarea{min-height:140px;resize:vertical;line-height:1.5;}
+  input:focus, textarea:focus, select:focus{
+    outline:2px solid var(--sage);
+    outline-offset:1px;
+    border-color:var(--sage);
+  }
+  .checkbox-row{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    margin-bottom:8px;
+    cursor:pointer;
+  }
+  .checkbox-row:hover{border-color:var(--sage);}
+  .checkbox-row input{width:auto;margin:2px 0 0 0;}
+  .checkbox-row .role-label{font-size:15px;color:var(--ink);}
+  .checkbox-row .role-track{font-size:12px;color:var(--slate);}
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    padding:12px 22px;
+    border-radius:4px;
+    border:none;
+    cursor:pointer;
+    transition:opacity 0.15s;
+  }
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+  button:hover:not(:disabled){opacity:0.88;}
+  .btn-primary{background:var(--sage-dark);color:#fff;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1px solid var(--line);}
+  .btn-row{display:flex;gap:12px;margin-top:24px;}
+  .btn-row.right{justify-content:flex-end;}
+
+  /* header bar during assessment */
+  .topbar{
+    position:sticky;top:0;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+    padding:14px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    z-index:10;
+  }
+  .topbar .brand{font-family:'Source Serif 4',serif;font-weight:600;font-size:15px;}
+  .timer{
+    font-variant-numeric:tabular-nums;
+    font-size:15px;
+    font-weight:600;
+    padding:5px 12px;
+    border-radius:4px;
+    background:var(--card);
+    border:1px solid var(--line);
+  }
+  .timer.low{color:var(--red);border-color:var(--red);}
+
+  /* question map */
+  .qmap-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(46px,1fr));
+    gap:8px;
+    margin:20px 0 8px;
+  }
+  .qmap-dot{
+    height:46px;
+    border-radius:4px;
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:600;
+    cursor:pointer;
+    background:var(--card);color:var(--slate);
+  }
+  .qmap-dot.submitted{background:var(--sage);border-color:var(--sage);color:#fff;cursor:default;}
+  .qmap-dot.progress{background:#F4E9D8;border-color:var(--amber);color:var(--amber);}
+  .qmap-legend{display:flex;gap:18px;font-size:13px;color:var(--slate);margin-bottom:6px;}
+  .qmap-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot-swatch{width:10px;height:10px;border-radius:2px;display:inline-block;}
+
+  /* question screen */
+  .qmeta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .qtag{font-size:12px;font-weight:600;color:var(--sage-dark);letter-spacing:0.01em;}
+  .qtimer{font-size:12px;color:var(--slate);font-variant-numeric:tabular-nums;}
+  .prompt{font-size:17px;line-height:1.6;margin:14px 0 22px;color:var(--ink);}
+
+  video, .video-preview{width:100%;border-radius:4px;background:#111;margin-bottom:14px;}
+  .rec-status{font-size:13px;color:var(--red);font-weight:600;margin-bottom:10px;display:none;}
+  .rec-status.active{display:block;}
+  .rec-controls{display:flex;gap:10px;margin-bottom:16px;}
+
+  .hint{font-size:13px;color:var(--slate);margin-top:-8px;margin-bottom:16px;}
+  .locked-note{
+    background:#F0F3EE;border:1px solid var(--sage);color:var(--sage-dark);
+    padding:10px 14px;border-radius:4px;font-size:13px;margin-bottom:16px;
+  }
+  .final-note{text-align:center;padding:60px 0;}
+  a.plain{color:var(--sage-dark);}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   CONFIG — item banks, tracks, timings
+   ============================================================ */
+
+// TODO before go-live: replace with your deployed Apps Script Web App URL
+const ENDPOINT_URL = "REPLACE_WITH_APPS_SCRIPT_WEB_APP_URL";
+
+const ROLES = [
+  {id:"marketing", label:"Marketing", track:"business"},
+  {id:"sales", label:"Sales", track:"business"},
+  {id:"product_design", label:"Product Design", track:"design"},
+  {id:"full_stack", label:"Full Stack", track:"engineering"},
+  {id:"backend", label:"Backend", track:"engineering"},
+  {id:"frontend", label:"Frontend", track:"engineering"},
+  {id:"ai_coding", label:"AI Coding", track:"aicoding"}
+];
+
+const TRACK_LABELS = {
+  business:"Business / Client-facing",
+  design:"Design / Product",
+  engineering:"Engineering",
+  aicoding:"AI Coding"
+};
+
+// Session 1: Quantitative Ability (role-agnostic) — 14 objective (MCQ) + 6 subjective (written)
+// items, each probing a distinct thinking pattern rather than repeating the same skill.
+const QUANT_ITEMS = [
+  // --- Objective (MCQ) — fast, auto-graded, hard to usefully outsource one at a time ---
+  {id:"QM1", type:"mcq", tag:"Arithmetic", prompt:"A client gets a 15% discount on a ₹4,80,000 annual license, committing for 3 years paid upfront. What is the effective annual cost?", options:["₹3,88,000","₹4,08,000","₹4,20,000","₹4,32,000"], correctIndex:2},
+  {id:"QM2", type:"mcq", tag:"Pattern recognition", prompt:"A defaulter list shrinks by half every week (240 in week 1). In which week does it first drop below 10?", options:["Week 4","Week 5","Week 6","Week 7"], correctIndex:2},
+  {id:"QM3", type:"mcq", tag:"Data reading", prompt:"Hospital A's admin-hours-saved over 3 months: 40, 65, 72. Hospital D's: 10, 40, 85. Which is the more credible steady improvement trend (least likely to be a one-off spike)?", options:["Hospital A","Hospital D","Both equally credible","Neither shows a trend"], correctIndex:0},
+  {id:"QM4", type:"mcq", tag:"Probability", prompt:"A funnel converts leads to demos at 30%, and demos to paid pilots at 25%. Out of 200 leads, roughly how many become paid pilots?", options:["10","15","20","30"], correctIndex:1},
+  {id:"QM5", type:"mcq", tag:"Ratio & proportion", prompt:"A pilot budget of ₹10,00,000 is split across 3 segments in a 5:3:2 ratio. What's the allocation to the middle-weighted segment?", options:["₹2,00,000","₹3,00,000","₹5,00,000","₹3,50,000"], correctIndex:1},
+  {id:"QM6", type:"mcq", tag:"Logical deduction", prompt:"A feature ships only when both 'tested' and 'approved' are true. If a feature is not shipped, which must be true?", options:["It is definitely not tested","It is definitely not approved","At least one of tested/approved is false","Both tested and approved are false"], correctIndex:2},
+  {id:"QM7", type:"mcq", tag:"Order-of-magnitude estimation", prompt:"Roughly how many schools (all boards combined) are there in the state of Karnataka?", options:["~2,000","~15,000","~55,000","~2,00,000"], correctIndex:2},
+  {id:"QM8", type:"mcq", tag:"Conditional / algorithmic flow", prompt:"A system auto-escalates a support ticket only if (priority = High) AND (unresolved for 24h). A High-priority ticket sits unresolved for 30h and is NOT escalated. What's the most likely explanation?", options:["The ticket is actually not High priority","The 24h rule only applies to Medium priority","The escalation logic has a bug or was disabled","There is no explanation — this cannot happen"], correctIndex:2},
+  {id:"QM9", type:"mcq", tag:"Root-cause elimination", prompt:"Weekly active users on a product dropped 20% the week after a new feature launched. Which of these is the LEAST likely explanation on its own?", options:["A bug in the new feature broke a common workflow","The launch coincided with a public holiday week","Users individually decided they disliked the brand's logo color","A dependent third-party integration went down that week"], correctIndex:2},
+  {id:"QM10", type:"mcq", tag:"Data reading — multi-category", prompt:"Three regions' monthly signups: North: 40, 42, 41. South: 20, 35, 55. East: 60, 58, 61. Which region is most likely to be systematically under-forecast if next month is planned using a simple average of the last 3 months?", options:["North","South","East","None — all are stable"], correctIndex:1},
+  {id:"QM11", type:"mcq", tag:"Proportional scaling with a bottleneck", prompt:"One support agent resolves 20 tickets/day working alone. Two agents share one review queue and can together resolve only 30 tickets/day due to a review bottleneck. With 4 agents on the same shared queue, resolved tickets/day is most likely to be:", options:["80 (scales linearly)","Meaningfully less than 80, limited by the bottleneck","Exactly 60","Impossible to estimate"], correctIndex:1},
+  {id:"QM12", type:"mcq", tag:"Statistical reasoning", prompt:"A screening test is 90% accurate, and the condition it screens for affects only 2% of the population. A random person tests positive. Why might they still be more likely to NOT have the condition?", options:["90% accuracy means the test is unreliable", "The test only works on symptomatic people", "The rare base rate means false positives from the healthy majority can outnumber true positives", "This is not possible if the test is 90% accurate"], correctIndex:2},
+  {id:"QM13", type:"mcq", tag:"Sequence completion", prompt:"A cohort's week-over-week retention is 100%, 80%, 64%, 51.2%. What is the retention rate in the next week, following the same pattern?", options:["38.4%","40.96%","45%","32%"], correctIndex:1},
+  {id:"QM14", type:"mcq", tag:"Cost-benefit / breakeven", prompt:"A ₹2,40,000 one-time automation cost saves 40 hours/month at an effective cost of ₹1,000/hour. In how many months does it break even?", options:["4 months","5 months","6 months","8 months"], correctIndex:2},
+  // --- Subjective (written reasoning) ---
+  {id:"Q1", type:"subjective", tag:"Subjective — guesstimation", prompt:"Merxflo helps retailers unify fragmented commerce systems. Roughly how many mid-sized retail chains in India (50–500 stores) might still be running on disconnected inventory/POS systems today? Walk through your assumptions step by step."},
+  {id:"Q4", type:"subjective", tag:"Subjective — data reading", prompt:"A hospital using Clinexia shows the following admin-hours-saved per month over 3 months: Hospital A: 40, 65, 72. Hospital B: 20, 55, 90. Hospital C: 50, 52, 51. Hospital D: 10, 40, 85. Which hospital's trend is the most credible evidence that the product works? Name one alternative explanation for that hospital's trend besides 'the product works.'"},
+  {id:"Q6", type:"subjective", tag:"Subjective — algorithmic thinking", prompt:"Design, in plain steps (no code needed), a process to flag Merxflo retail clients whose order-sync failures are trending up before they churn. What would make this process fail silently, without anyone noticing?"},
+  {id:"Q8", type:"subjective", tag:"Subjective — computation under ambiguity", prompt:"A client asks for a 15% discount on a ₹4,80,000 annual license if they commit for 3 years, paid upfront. What's the effective annual cost, and what's one thing you'd want to clarify before quoting this back to them?"},
+  {id:"Q9", type:"subjective", tag:"Subjective — reasoning under uncertainty", prompt:"You're told Dronafy's pilot with a school shows 'improved engagement' but you only have 3 weeks of data and no baseline before the pilot started. How confident should you be in that claim, and what would you ask for before trusting it?"},
+  {id:"Q10", type:"subjective", tag:"Subjective — root-cause diagnosis", prompt:"Weekly active users on Clinexia's clinician dashboard dropped 20% the week after a UI update shipped. Walk through how you'd actually investigate the cause, step by step, rather than jumping to a conclusion."}
+];
+
+// Session 1: Communication (role-agnostic)
+const COMM_ITEMS = [
+  {id:"C1", type:"subjective", tag:"Written", video:false, prompt:"Explain what Dronafy does to someone who has never used any digital learning tool. 100 words max."},
+  {id:"C3", type:"subjective", tag:"Mom's Test critique", video:false, prompt:"Here's a question a founder asked a school principal during customer discovery: \"Would you find it useful if Dronafy could auto-flag at-risk students?\" What's wrong with this question, and how would you rewrite it to get honest signal instead of a polite yes?"},
+  {id:"C4", type:"subjective", tag:"Mom's Test critique", video:false, prompt:"A founder asked a hospital administrator: \"Do you think Clinexia's handoff feature would save your team time?\" Same task: diagnose the flaw in this question, and rewrite it."},
+  {id:"C5", type:"subjective", tag:"Situational — video", video:true, prompt:"You're in a client meeting and the client says: \"This looks like just another dashboard, why should we pay for this?\" Respond to them directly, as if they were in front of you now. You have up to 90 seconds."},
+  {id:"C6", type:"subjective", tag:"Introduction — video", video:true, prompt:"Introduce yourself and explain, in your own words, why you're a fit for a role at an early-stage enterprise AI company. Up to 90 seconds."}
+];
+
+// Session 2: Behavioral — full matrix, 6 competencies x 4 tracks
+const BEHAVIORAL_MATRIX = {
+  ownership:{
+    label:"Ownership",
+    business:"A campaign you ran underperformed and no one else has noticed yet. What do you do?",
+    design:"A design decision you made shipped and is now causing user confusion, but no one has traced it back to you yet. What do you do?",
+    engineering:"You notice a process or system outside your assigned scope is clearly broken. Do you flag it, fix it, or leave it? Why?",
+    aicoding:"A model or prompt behavior you built is producing subtly wrong outputs in production, and no one else has caught it yet. What do you do?"
+  },
+  ambiguity:{
+    label:"Ambiguity Tolerance",
+    business:"A client says they want \"better engagement\" but can't define what that means. What do you do in the first conversation?",
+    design:"You're asked to \"make the assessment feel more adaptive\" with no spec. What are your first three questions before you start designing?",
+    engineering:"You're asked to \"make the assessment feel more adaptive\" with no spec. What are your first three questions before you write a line of code?",
+    aicoding:"You're told \"use AI to make this smarter\" with no defined success metric. What do you clarify before building anything?"
+  },
+  collaboration:{
+    label:"Collaboration",
+    business:"A teammate on the sales side disagrees with your read of a client's real objection. How do you resolve it before the next call?",
+    design:"A developer pushes back on a design as \"not feasible\" close to a deadline. What do you do?",
+    engineering:"Two teammates disagree on the right technical approach and it's stalling a deadline. What do you do?",
+    aicoding:"A teammate wants to ship a model output you think isn't reliable enough yet. How do you handle that disagreement?"
+  },
+  resilience:{
+    label:"Resilience",
+    business:"You pitched Merxflo to a retail chain and they went with a competitor after 3 months of effort. Walk through what you'd do next, concretely.",
+    design:"A design you were confident in tested badly with real users. Walk through what you'd do next.",
+    engineering:"You shipped a feature, and testing reveals the core logic was wrong from the start. Walk through what you'd do next.",
+    aicoding:"A model approach you spent two weeks on turns out to be fundamentally the wrong architecture. Walk through what you'd do next."
+  },
+  detail:{
+    label:"Attention to Detail",
+    business:"You're drafting a client proposal and notice the pricing sheet has a typo just before sending. What's your process here?",
+    design:"You're about to ship a flow and notice an edge case that breaks it for a small subset of users. What's your process here?",
+    engineering:"You find a subtle bug in a scoring pipeline that's been live for 2 weeks and may have affected past results. What do you do?",
+    aicoding:"You notice your evaluation set for a model has a subtle bias that's been inflating accuracy numbers for weeks. What do you do?"
+  },
+  empathy:{
+    label:"Customer Empathy",
+    business:"A landing-page test for a new Merxflo feature got 40 sign-ups in a week. The founder wants to greenlight full build. What questions would you ask before agreeing?",
+    design:"Users say they \"love\" a new Dronafy feature in interviews, but usage data shows no one has repeated it after first use. What's your read?",
+    engineering:"A stakeholder wants to fast-track building a feature based on one enthusiastic customer email. What would you want to know first?",
+    aicoding:"A demo of an AI feature gets a great reaction in a meeting. What would you check before treating that as validation?"
+  }
+};
+
+const SESSION_TIME_LIMITS = {
+  session1: 60*60,
+  session2: 60*60
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let state = {
+  screen:"landing",
+  candidate:{name:"", email:""},
+  session:null,           // "session1" | "session2"
+  selectedRoles:[],
+  questions:[],           // built list for the active session
+  answers:{},             // id -> {text, videoBlob, videoMime, submitted, timeSpent}
+  currentQid:null,
+  globalTimeLeft:0,
+  globalTimerHandle:null,
+  qTimerHandle:null,
+  qTimerStart:null,       // ms timestamp when current question view started
+  mediaRecorder:null,
+  recordedChunks:[],
+  recStartTime:null
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function fmtTime(sec){
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return m + ":" + String(s).padStart(2,"0");
+}
+
+function buildSession1Questions(){
+  return [
+    ...QUANT_ITEMS.map(q=>({...q, section:"Quantitative Ability"})),
+    ...COMM_ITEMS.map(q=>({...q, section:"Communication"}))
+  ];
+}
+
+function buildSession2Questions(roleIds){
+  const tracks = [...new Set(roleIds.map(rid => ROLES.find(r=>r.id===rid).track))];
+  const qs = [];
+  tracks.forEach(track=>{
+    Object.entries(BEHAVIORAL_MATRIX).forEach(([key, comp])=>{
+      qs.push({
+        id: track + "_" + key,
+        tag: comp.label + " — " + TRACK_LABELS[track],
+        video:false,
+        prompt: comp[track],
+        section:"Behavioral — " + TRACK_LABELS[track]
+      });
+    });
+  });
+  return qs;
+}
+
+function sendToBackend(payload){
+  if(ENDPOINT_URL.indexOf("REPLACE_WITH") === 0){
+    console.warn("Endpoint not configured — payload not sent:", payload.type, payload.questionId||"");
+    return;
+  }
+  fetch(ENDPOINT_URL, {
+    method:"POST",
+    mode:"no-cors",
+    headers:{"Content-Type":"text/plain"}, // avoids CORS preflight on Apps Script
+    body: JSON.stringify(payload)
+  }).catch(err=>console.warn("Save failed, will retry on final submit", err));
+}
+
+function blobToBase64(blob){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onloadend = ()=> resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/* ============================================================
+   RENDER ROUTER
+   ============================================================ */
+function render(){
+  const app = document.getElementById("app");
+  if(state.screen==="landing") app.innerHTML = renderLanding();
+  else if(state.screen==="roles") app.innerHTML = renderRoles();
+  else if(state.screen==="instructions") app.innerHTML = renderInstructions();
+  else if(state.screen==="map") app.innerHTML = renderMap();
+  else if(state.screen==="question") app.innerHTML = renderQuestion();
+  else if(state.screen==="done") app.innerHTML = renderDone();
+  bindEvents();
+}
+
+/* ---------- LANDING ---------- */
+function renderLanding(){
+  return `
+  <div class="screen">
+    <div class="eyebrow">Altumind Internship Screening</div>
+    <h1>Round 1 Assessment</h1>
+    <p class="lede">This assessment is split into two independent sessions. You can complete them in separate sittings — this link works for either.</p>
+    <div class="card">
+      <label for="fname">Full name</label>
+      <input type="text" id="fname" value="${state.candidate.name}">
+      <label for="femail">Email</label>
+      <input type="email" id="femail" value="${state.candidate.email}">
+      <label for="fsession">Which session are you starting?</label>
+      <select id="fsession">
+        <option value="">Select a session</option>
+        <option value="session1">Session 1 — Quantitative Ability &amp; Communication (90 min)</option>
+        <option value="session2">Session 2 — Behavioral Competencies (60 min)</option>
+      </select>
+      <div class="btn-row">
+        <button class="btn-primary" id="btnStart">Continue</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- ROLE SELECT (session2 only) ---------- */
+function renderRoles(){
+  const rows = ROLES.map(r=>`
+    <label class="checkbox-row">
+      <input type="checkbox" value="${r.id}" ${state.selectedRoles.includes(r.id)?"checked":""}>
+      <span>
+        <div class="role-label">${r.label}</div>
+        <div class="role-track">${TRACK_LABELS[r.track]}</div>
+      </span>
+    </label>`).join("");
+  return `
+  <div class="screen">
+    <div class="eyebrow">Session 2 — Behavioral Competencies</div>
+    <h1>Which role(s) are you applying for?</h1>
+    <p class="lede">Select all that apply. Every competency will be assessed, contextualized to the role area(s) you choose. If your roles span more than one area, you'll complete a scenario set for each area.</p>
+    <div class="card">
+      ${rows}
+      <div class="btn-row">
+        <button class="btn-secondary" id="btnBack">Back</button>
+        <button class="btn-primary" id="btnRolesNext">Continue</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- INSTRUCTIONS ---------- */
+function renderInstructions(){
+  const limit = SESSION_TIME_LIMITS[state.session];
+  const n = state.questions.length;
+  return `
+  <div class="screen">
+    <div class="eyebrow">${state.session==="session1" ? "Session 1 — Quant & Communication" : "Session 2 — Behavioral Competencies"}</div>
+    <h1>Before you begin</h1>
+    <div class="card">
+      <p>You have <strong>${fmtTime(limit)} minutes</strong> total for this session, and there are <strong>${n} questions</strong>.</p>
+      <p>Rules:</p>
+      <p>— One question is shown at a time.<br>
+      — You may hit <strong>Review</strong> to save your progress and move to another question, then return to finish it later — your time on that question keeps accumulating across visits.<br>
+      — Once you hit <strong>Submit</strong> on a question, it is locked and cannot be revisited.<br>
+      — If the session timer runs out, all remaining answers are submitted automatically as they stand.<br>
+      ${state.session==="session1" ? "— This session mixes quick objective (multiple-choice) and written questions, plus one short video response (up to 90 seconds). Your browser will ask for camera and microphone permission for that question." : ""}</p>
+      <div class="btn-row">
+        <button class="btn-secondary" id="btnBack">Back</button>
+        <button class="btn-primary" id="btnBeginSession">Start session</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- QUESTION MAP ---------- */
+function renderMap(){
+  const dots = state.questions.map((q,i)=>{
+    const a = state.answers[q.id];
+    let cls = "qmap-dot";
+    if(a && a.submitted) cls += " submitted";
+    else if(a && a.timeSpent>0) cls += " progress";
+    return `<div class="${cls}" data-qid="${q.id}">${i+1}</div>`;
+  }).join("");
+
+  const allSubmitted = state.questions.every(q=>state.answers[q.id] && state.answers[q.id].submitted);
+
+  return `
+  <div class="topbar">
+    <div class="brand">Altumind Assessment</div>
+    <div class="timer ${state.globalTimeLeft<300?'low':''}" id="globalTimerDisplay">${fmtTime(state.globalTimeLeft)}</div>
+  </div>
+  <div class="screen">
+    <h2>Question overview</h2>
+    <p>Click any unlocked question to continue. Submitted questions are locked.</p>
+    <div class="qmap-legend">
+      <span><span class="dot-swatch" style="background:var(--card);border:1px solid var(--line)"></span> Not started</span>
+      <span><span class="dot-swatch" style="background:#F4E9D8;border:1px solid var(--amber)"></span> In progress</span>
+      <span><span class="dot-swatch" style="background:var(--sage)"></span> Submitted</span>
+    </div>
+    <div class="qmap-grid">${dots}</div>
+    <div class="btn-row">
+      <button class="btn-primary" id="btnFinish" ${allSubmitted? "" : "disabled"}>Finish session</button>
+    </div>
+    ${allSubmitted? "" : `<p class="hint">Finish becomes available once every question is submitted.</p>`}
+  </div>`;
+}
+
+/* ---------- QUESTION ---------- */
+function renderQuestion(){
+  const q = state.questions.find(x=>x.id===state.currentQid);
+  const a = state.answers[q.id] || {text:"", timeSpent:0, submitted:false};
+  const idx = state.questions.findIndex(x=>x.id===q.id) + 1;
+
+  let body;
+  if(q.type==="mcq"){
+    const optRows = q.options.map((opt,i)=>`
+      <label class="checkbox-row">
+        <input type="radio" name="mcqOption" value="${i}" ${a.selectedOption===i?"checked":""}>
+        <span class="role-label">${opt}</span>
+      </label>`).join("");
+    body = `<div id="mcqOptions">${optRows}</div>`;
+  } else if(q.video){
+    body = `
+      <video id="preview" autoplay muted playsinline></video>
+      <div class="rec-status" id="recStatus">Recording — <span id="recTimer">0</span>s / 90s</div>
+      <div class="rec-controls">
+        <button class="btn-secondary" id="btnRecord" type="button">Start recording</button>
+        <button class="btn-secondary" id="btnStop" type="button" disabled>Stop</button>
+      </div>
+      ${a.videoBlobUrl ? `<p class="hint">Recorded response ready. Recording again will replace it.</p><video src="${a.videoBlobUrl}" controls class="video-preview"></video>` : ""}
+    `;
+  } else {
+    body = `<textarea id="answerText" placeholder="Type your response here...">${a.text||""}</textarea>`;
+  }
+
+  return `
+  <div class="topbar">
+    <div class="brand">Altumind Assessment</div>
+    <div class="timer ${state.globalTimeLeft<300?'low':''}" id="globalTimerDisplay">${fmtTime(state.globalTimeLeft)}</div>
+  </div>
+  <div class="screen">
+    <div class="qmeta">
+      <div class="qtag">${q.section} · Question ${idx} of ${state.questions.length}</div>
+      <div class="qtimer">Time on this question: <span id="qTimerDisplay">${fmtTime(a.timeSpent||0)}</span></div>
+    </div>
+    <div class="prompt">${q.prompt}</div>
+    ${body}
+    <div class="btn-row">
+      <button class="btn-secondary" id="btnReview">Review (save &amp; switch question)</button>
+      <button class="btn-primary" id="btnSubmitQ">Submit answer</button>
+    </div>
+  </div>`;
+}
+
+/* ---------- DONE ---------- */
+function renderDone(){
+  return `
+  <div class="screen">
+    <div class="final-note">
+      <h1>Session complete</h1>
+      <p>Your responses for this session have been recorded. You can close this window now.</p>
+      <p class="hint">If you have another session to complete, reopen this link.</p>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   EVENT BINDING
+   ============================================================ */
+function bindEvents(){
+  const $ = id => document.getElementById(id);
+
+  if(state.screen==="landing"){
+    $("btnStart").onclick = ()=>{
+      const name = $("fname").value.trim();
+      const email = $("femail").value.trim();
+      const session = $("fsession").value;
+      if(!name || !email || !session){ alert("Please fill in your name, email, and select a session."); return; }
+      state.candidate = {name, email};
+      state.session = session;
+      if(session==="session2"){
+        state.screen = "roles";
+      } else {
+        state.questions = buildSession1Questions();
+        state.screen = "instructions";
+      }
+      render();
+    };
+  }
+
+  if(state.screen==="roles"){
+    $("btnBack").onclick = ()=>{ state.screen="landing"; render(); };
+    $("btnRolesNext").onclick = ()=>{
+      const checked = Array.from(document.querySelectorAll('.checkbox-row input:checked')).map(el=>el.value);
+      if(checked.length===0){ alert("Select at least one role."); return; }
+      state.selectedRoles = checked;
+      state.questions = buildSession2Questions(checked);
+      state.screen = "instructions";
+      render();
+    };
+  }
+
+  if(state.screen==="instructions"){
+    $("btnBack").onclick = ()=>{
+      state.screen = state.session==="session2" ? "roles" : "landing";
+      render();
+    };
+    $("btnBeginSession").onclick = ()=>{
+      state.globalTimeLeft = SESSION_TIME_LIMITS[state.session];
+      startGlobalTimer();
+      sendToBackend({
+        type:"session_start", session:state.session, candidate:state.candidate,
+        roles:state.selectedRoles, questionIds:state.questions.map(q=>q.id),
+        timestamp:new Date().toISOString()
+      });
+      state.screen = "map";
+      render();
+    };
+  }
+
+  if(state.screen==="map"){
+    document.querySelectorAll(".qmap-dot").forEach(dot=>{
+      dot.onclick = ()=>{
+        const qid = dot.dataset.qid;
+        const a = state.answers[qid];
+        if(a && a.submitted) return;
+        openQuestion(qid);
+      };
+    });
+    const finishBtn = $("btnFinish");
+    if(finishBtn && !finishBtn.disabled){
+      finishBtn.onclick = finishSession;
+    }
+  }
+
+  if(state.screen==="question"){
+    const q = state.questions.find(x=>x.id===state.currentQid);
+
+    $("btnReview").onclick = ()=>{ pauseQuestionTimer(saveDraftAndGoToMap); };
+    $("btnSubmitQ").onclick = ()=>{ submitCurrentQuestion(); };
+
+    if(q.video){
+      $("btnRecord").onclick = startRecording;
+      $("btnStop").onclick = stopRecording;
+    }
+  }
+}
+
+/* ============================================================
+   TIMERS
+   ============================================================ */
+function startGlobalTimer(){
+  if(state.globalTimerHandle) clearInterval(state.globalTimerHandle);
+  state.globalTimerHandle = setInterval(()=>{
+    state.globalTimeLeft--;
+    const el = document.getElementById("globalTimerDisplay");
+    if(el){
+      el.textContent = fmtTime(state.globalTimeLeft);
+      el.classList.toggle("low", state.globalTimeLeft < 300);
+    }
+    if(state.globalTimeLeft<=0){
+      clearInterval(state.globalTimerHandle);
+      autoSubmitAllAndEnd();
+    }
+  },1000);
+}
+
+function startQuestionTimer(qid){
+  state.qTimerStart = Date.now();
+  if(state.qTimerHandle) clearInterval(state.qTimerHandle);
+  state.qTimerHandle = setInterval(()=>{
+    const el = document.getElementById("qTimerDisplay");
+    if(el){
+      const base = (state.answers[qid] && state.answers[qid].timeSpent) || 0;
+      const elapsed = base + (Date.now()-state.qTimerStart)/1000;
+      el.textContent = fmtTime(elapsed);
+    }
+  },1000);
+}
+
+function pauseQuestionTimer(callback){
+  if(state.qTimerHandle) clearInterval(state.qTimerHandle);
+  const qid = state.currentQid;
+  if(qid && state.qTimerStart){
+    const elapsedSec = (Date.now()-state.qTimerStart)/1000;
+    const a = state.answers[qid] || {text:"", timeSpent:0, submitted:false};
+    a.timeSpent = (a.timeSpent||0) + elapsedSec;
+    state.answers[qid] = a;
+  }
+  state.qTimerStart = null;
+  if(callback) callback();
+}
+
+/* ============================================================
+   QUESTION FLOW
+   ============================================================ */
+function openQuestion(qid){
+  state.currentQid = qid;
+  const existing = state.answers[qid];
+  if(!existing) state.answers[qid] = {text:"", timeSpent:0, submitted:false};
+  state.screen = "question";
+  render();
+  startQuestionTimer(qid);
+}
+
+function saveDraftAndGoToMap(){
+  const qid = state.currentQid;
+  const q = state.questions.find(x=>x.id===qid);
+  if(q && q.type==="mcq"){
+    const checked = document.querySelector('input[name="mcqOption"]:checked');
+    if(checked) state.answers[qid].selectedOption = parseInt(checked.value,10);
+  } else if(q && !q.video){
+    const el = document.getElementById("answerText");
+    if(el) state.answers[qid].text = el.value;
+  }
+  state.screen = "map";
+  render();
+}
+
+function submitCurrentQuestion(){
+  pauseQuestionTimer(async ()=>{
+    const qid = state.currentQid;
+    const q = state.questions.find(x=>x.id===qid);
+    const a = state.answers[qid];
+
+    if(q.type==="mcq"){
+      const checked = document.querySelector('input[name="mcqOption"]:checked');
+      if(checked) a.selectedOption = parseInt(checked.value,10);
+      if(a.selectedOption===undefined || a.selectedOption===null){ alert("Please select an option before submitting."); resumeAfterCancelledSubmit(qid); return; }
+    } else if(q.video){
+      if(!a.videoBlob){ alert("Please record your response before submitting."); resumeAfterCancelledSubmit(qid); return; }
+    } else {
+      const el = document.getElementById("answerText");
+      if(el) a.text = el.value;
+      if(!a.text || !a.text.trim()){ alert("Please enter a response before submitting."); resumeAfterCancelledSubmit(qid); return; }
+    }
+
+    a.submitted = true;
+
+    let videoBase64 = null;
+    if(q.video && a.videoBlob){
+      videoBase64 = await blobToBase64(a.videoBlob);
+    }
+
+    sendToBackend({
+      type:"question_submit",
+      session:state.session,
+      candidate:state.candidate,
+      questionId: qid,
+      section: q.section,
+      answerText: a.text || null,
+      selectedOption: (q.type==="mcq") ? a.selectedOption : null,
+      selectedOptionText: (q.type==="mcq") ? q.options[a.selectedOption] : null,
+      isCorrect: (q.type==="mcq") ? (a.selectedOption===q.correctIndex) : null,
+      videoBase64: videoBase64,
+      videoMime: q.video ? "video/webm" : null,
+      timeSpentSec: Math.round(a.timeSpent),
+      timestamp: new Date().toISOString()
+    });
+
+    state.screen = "map";
+    render();
+  });
+}
+
+function resumeAfterCancelledSubmit(qid){
+  // re-arm the question timer since we paused it before validation failed
+  state.currentQid = qid;
+  startQuestionTimer(qid);
+}
+
+function finishSession(){
+  if(state.globalTimerHandle) clearInterval(state.globalTimerHandle);
+  sendToBackend({
+    type:"session_complete",
+    session:state.session,
+    candidate:state.candidate,
+    timestamp:new Date().toISOString()
+  });
+  state.screen = "done";
+  render();
+}
+
+function autoSubmitAllAndEnd(){
+  // lock in whatever is on screen for the current question, then force-submit every unsubmitted question with current draft state
+  const qid = state.currentQid;
+  if(qid && state.screen==="question"){
+    const q = state.questions.find(x=>x.id===qid);
+    if(q && q.type==="mcq"){
+      const checked = document.querySelector('input[name="mcqOption"]:checked');
+      if(checked) state.answers[qid].selectedOption = parseInt(checked.value,10);
+    } else if(q && !q.video){
+      const el = document.getElementById("answerText");
+      if(el) state.answers[qid].text = el.value;
+    }
+  }
+  state.questions.forEach(q=>{
+    const a = state.answers[q.id] || {text:"", timeSpent:0, submitted:false};
+    if(!a.submitted){
+      a.submitted = true;
+      state.answers[q.id] = a;
+      sendToBackend({
+        type:"question_submit_autotimeout",
+        session:state.session,
+        candidate:state.candidate,
+        questionId:q.id,
+        section:q.section,
+        answerText:a.text||null,
+        selectedOption: (q.type==="mcq") ? (a.selectedOption!==undefined ? a.selectedOption : null) : null,
+        selectedOptionText: (q.type==="mcq" && a.selectedOption!==undefined) ? q.options[a.selectedOption] : null,
+        isCorrect: (q.type==="mcq" && a.selectedOption!==undefined) ? (a.selectedOption===q.correctIndex) : null,
+        videoBase64:null,
+        timeSpentSec:Math.round(a.timeSpent||0),
+        timestamp:new Date().toISOString()
+      });
+    }
+  });
+  sendToBackend({
+    type:"session_complete_autotimeout",
+    session:state.session, candidate:state.candidate,
+    timestamp:new Date().toISOString()
+  });
+  state.screen = "done";
+  render();
+}
+
+/* ============================================================
+   VIDEO RECORDING
+   ============================================================ */
+async function startRecording(){
+  const qid = state.currentQid;
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    const previewEl = document.getElementById("preview");
+    previewEl.srcObject = stream;
+
+    state.recordedChunks = [];
+    state.mediaRecorder = new MediaRecorder(stream, {mimeType:"video/webm"});
+    state.mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) state.recordedChunks.push(e.data); };
+    state.mediaRecorder.onstop = ()=>{
+      const blob = new Blob(state.recordedChunks, {type:"video/webm"});
+      state.answers[qid].videoBlob = blob;
+      state.answers[qid].videoBlobUrl = URL.createObjectURL(blob);
+      stream.getTracks().forEach(t=>t.stop());
+      render(); // re-render to show preview + re-bind
+      startQuestionTimer(qid); // timer keeps running across re-render
+    };
+    state.mediaRecorder.start();
+    state.recStartTime = Date.now();
+
+    document.getElementById("recStatus").classList.add("active");
+    document.getElementById("btnRecord").disabled = true;
+    document.getElementById("btnStop").disabled = false;
+
+    const tickHandle = setInterval(()=>{
+      const secs = Math.round((Date.now()-state.recStartTime)/1000);
+      const timerEl = document.getElementById("recTimer");
+      if(timerEl) timerEl.textContent = secs;
+      if(secs>=90 || state.mediaRecorder.state!=="recording"){
+        clearInterval(tickHandle);
+        if(state.mediaRecorder.state==="recording") state.mediaRecorder.stop();
+      }
+    },1000);
+  }catch(err){
+    alert("Camera/microphone access is required for this question. Please allow access and try again.");
+  }
+}
+
+function stopRecording(){
+  if(state.mediaRecorder && state.mediaRecorder.state==="recording"){
+    state.mediaRecorder.stop();
+  }
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+render();
+</script>
+</body>
+</html>
