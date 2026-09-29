@@ -164,6 +164,8 @@
   .qtag{font-size:12px;font-weight:600;color:var(--sage-dark);letter-spacing:0.01em;flex:1;min-width:0;overflow-wrap:break-word;}
   .qtimer{font-size:12px;color:var(--slate);font-variant-numeric:tabular-nums;flex-shrink:0;white-space:nowrap;}
   .prompt{font-size:17px;line-height:1.6;margin:14px 0 22px;color:var(--ink);user-select:none;-webkit-user-select:none;overflow-wrap:break-word;word-break:break-word;}
+  .question-content{transition:filter 0.35s ease;}
+  .question-content.idle-blurred{filter:blur(8px);pointer-events:none;}
 
   video, .video-preview{width:100%;border-radius:4px;background:#111;margin-bottom:14px;}
   .rec-status{font-size:13px;color:var(--red);font-weight:600;margin-bottom:10px;display:none;}
@@ -174,6 +176,10 @@
   .locked-note{
     background:#F0F3EE;border:1px solid var(--sage);color:var(--sage-dark);
     padding:10px 14px;border-radius:4px;font-size:13px;margin-bottom:16px;
+  }
+  .warn-note{
+    background:#FBEFE0;border:1px solid var(--amber);color:#7A5518;
+    padding:10px 14px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none;
   }
   .final-note{text-align:center;padding:60px 0;}
   a.plain{color:var(--sage-dark);}
@@ -506,19 +512,19 @@ function attachIntegrityListeners(){
   if(state.listenersAttached) return;
   state.listenersAttached = true;
   document.addEventListener("visibilitychange", onVisibilityChange);
-  window.addEventListener("blur", onWindowBlur);
+  // Note: we deliberately do NOT listen for window "blur". Native alert()
+  // dialogs, the address bar, devtools, and OS notifications all fire blur
+  // without the candidate ever leaving the tab, so it produces false
+  // positives (this caused a real bug: a validation alert() was triggering
+  // an auto-submit). "visibilitychange" only fires when the tab itself is
+  // actually hidden (switched away from, minimized, or another window is
+  // brought fully to the foreground), which matches what we actually want
+  // to detect.
 }
 
 function onVisibilityChange(){
   if(document.hidden && state.sessionActive && state.screen!=="done"){
     triggerIntegrityViolation("tab_hidden");
-  }
-}
-
-function onWindowBlur(){
-  if(Date.now() < state.ignoreFocusUntil) return;
-  if(state.sessionActive && state.screen!=="done"){
-    triggerIntegrityViolation("window_blur");
   }
 }
 
@@ -528,9 +534,61 @@ function triggerIntegrityViolation(reason){
   autoSubmitAllAndEnd(reason);
 }
 
+/* Non-blocking validation messages. We deliberately avoid native alert() during
+   a live session: it freezes JS execution (silently pausing the visible countdown
+   for however long it's open) and, in some browsers, fires a window "blur" event
+   that could be mistaken for the candidate leaving the tab. This writes directly
+   into the DOM rather than calling render(), so in-progress form state (typed
+   text, checked boxes, selected radios) is never lost. */
+function showInlineWarning(msg){
+  let el = document.getElementById("inlineWarning");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "inlineWarning";
+    el.className = "warn-note";
+    const btnRow = document.querySelector(".btn-row");
+    if(btnRow && btnRow.parentNode){ btnRow.parentNode.insertBefore(el, btnRow); }
+    else { document.querySelector(".card, .screen").appendChild(el); }
+  }
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
 // Block copy / cut / paste / right-click everywhere, for the life of the page.
 ["copy","cut","paste","contextmenu"].forEach(evt=>{
   document.addEventListener(evt, e=>{ e.preventDefault(); return false; });
+});
+
+/* ============================================================
+   IDLE BLUR — the question text blurs if the page looks idle (no mouse
+   movement, clicks, taps, scrolling, or typing), and sharpens the moment
+   activity resumes. This is a deterrent against someone stepping away to
+   photograph the screen with a second device, not a real defense: it
+   won't stop a candidate who keeps the mouse moving with one hand while
+   photographing with the other, and it will also blur during genuine
+   silent thinking (which is common right before writing a longer answer).
+   Tune IDLE_BLUR_MS below if it's triggering too eagerly or too slowly.
+   Video-response questions are exempt — candidates need to read the
+   prompt steadily while recording, without it blurring on them.
+   ============================================================ */
+const IDLE_BLUR_MS = 5000;
+let idleBlurTimer = null;
+
+function armIdleBlur(){
+  if(idleBlurTimer) clearTimeout(idleBlurTimer);
+  const el = document.getElementById("questionContent");
+  if(el) el.classList.remove("idle-blurred");
+  if(state.screen!=="question") return;
+  idleBlurTimer = setTimeout(()=>{
+    if(state.screen==="question"){
+      const el2 = document.getElementById("questionContent");
+      if(el2) el2.classList.add("idle-blurred");
+    }
+  }, IDLE_BLUR_MS);
+}
+
+["mousemove","mousedown","touchstart","touchmove","pointermove","scroll","keydown"].forEach(evt=>{
+  document.addEventListener(evt, ()=>{ if(state.screen==="question") armIdleBlur(); }, {passive:true});
 });
 
 /* ============================================================
@@ -677,16 +735,19 @@ function renderQuestion(){
   const a = state.answers[q.id] || {text:"", timeSpent:0, submitted:false};
   const idx = state.questions.findIndex(x=>x.id===q.id) + 1;
 
-  let body;
+  let questionContentHtml, bodyHtml, idleHint = "";
   if(q.type==="mcq"){
     const optRows = q.options.map((opt,i)=>`
       <label class="checkbox-row">
         <input type="radio" name="mcqOption" value="${i}" ${a.selectedOption===i?"checked":""}>
         <span class="role-label">${opt}</span>
       </label>`).join("");
-    body = `<div id="mcqOptions">${optRows}</div>`;
+    questionContentHtml = `<div class="question-content" id="questionContent"><div class="prompt">${q.prompt}</div><div id="mcqOptions">${optRows}</div></div>`;
+    bodyHtml = "";
+    idleHint = `<p class="hint" style="margin-top:-10px;">The question blurs if this page looks idle — keep interacting with it (mouse or keyboard) while you work.</p>`;
   } else if(q.video){
-    body = `
+    questionContentHtml = `<div class="prompt">${q.prompt}</div>`; // video items are exempt — see note below
+    bodyHtml = `
       <video id="preview" autoplay muted playsinline></video>
       <div class="rec-status" id="recStatus">Recording — <span id="recTimer">0</span>s / 90s</div>
       <div class="rec-controls">
@@ -696,7 +757,9 @@ function renderQuestion(){
       ${a.videoBlobUrl ? `<p class="hint">Recorded response ready. Recording again will replace it.</p><video src="${a.videoBlobUrl}" controls class="video-preview"></video>` : ""}
     `;
   } else {
-    body = `<textarea id="answerText" placeholder="Type your response here...">${a.text||""}</textarea>`;
+    questionContentHtml = `<div class="question-content" id="questionContent"><div class="prompt">${q.prompt}</div></div>`;
+    bodyHtml = `<textarea id="answerText" placeholder="Type your response here...">${a.text||""}</textarea>`;
+    idleHint = `<p class="hint" style="margin-top:-10px;">The question blurs if this page looks idle — keep interacting with it (mouse or keyboard) while you work.</p>`;
   }
 
   return `
@@ -709,8 +772,9 @@ function renderQuestion(){
       <div class="qtag">${q.section} · Question ${idx} of ${state.questions.length}</div>
       <div class="qtimer">Time on this question: <span id="qTimerDisplay">${fmtTime(a.timeSpent||0)}</span></div>
     </div>
-    <div class="prompt">${q.prompt}</div>
-    ${body}
+    ${questionContentHtml}
+    ${idleHint}
+    ${bodyHtml}
     <div class="btn-row">
       <button class="btn-secondary" id="btnReview">Review (save &amp; switch question)</button>
       <button class="btn-primary" id="btnSubmitQ">Submit answer</button>
@@ -752,7 +816,7 @@ function bindEvents(){
       const session = $("fsession").value;
       const errEl = $("landingError");
       errEl.style.display = "none";
-      if(!name || !email || !session){ alert("Please fill in your name, email, and select a session."); return; }
+      if(!name || !email || !session){ showInlineWarning("Please fill in your name, email, and select a session."); return; }
 
       const localKey = "altumind_attempt_" + session + "_" + email.toLowerCase();
       if(localStorage.getItem(localKey)){
@@ -790,7 +854,7 @@ function bindEvents(){
     $("btnBack").onclick = ()=>{ state.screen="landing"; render(); };
     $("btnRolesNext").onclick = ()=>{
       const checked = Array.from(document.querySelectorAll('.checkbox-row input:checked')).map(el=>el.value);
-      if(checked.length===0){ alert("Select at least one role."); return; }
+      if(checked.length===0){ showInlineWarning("Select at least one role."); return; }
       state.selectedRoles = checked;
       state.questions = buildSession2Questions(checked);
       state.screen = "instructions";
@@ -805,7 +869,7 @@ function bindEvents(){
     };
     $("btnBeginSession").onclick = async ()=>{
       const consent = $("consentCheck");
-      if(!consent || !consent.checked){ alert("Please check the consent box to continue."); return; }
+      if(!consent || !consent.checked){ showInlineWarning("Please check the consent box to continue."); return; }
       $("btnBeginSession").disabled = true;
       $("btnBeginSession").textContent = "Starting...";
       await captureLocation();
@@ -844,6 +908,7 @@ function bindEvents(){
 
   if(state.screen==="question"){
     const q = state.questions.find(x=>x.id===state.currentQid);
+    armIdleBlur();
 
     $("btnReview").onclick = ()=>{ pauseQuestionTimer(saveDraftAndGoToMap); };
     $("btnSubmitQ").onclick = ()=>{ submitCurrentQuestion(); };
@@ -935,13 +1000,13 @@ function submitCurrentQuestion(){
     if(q.type==="mcq"){
       const checked = document.querySelector('input[name="mcqOption"]:checked');
       if(checked) a.selectedOption = parseInt(checked.value,10);
-      if(a.selectedOption===undefined || a.selectedOption===null){ alert("Please select an option before submitting."); resumeAfterCancelledSubmit(qid); return; }
+      if(a.selectedOption===undefined || a.selectedOption===null){ showInlineWarning("Please select an option before submitting."); resumeAfterCancelledSubmit(qid); return; }
     } else if(q.video){
-      if(!a.videoBlob){ alert("Please record your response before submitting."); resumeAfterCancelledSubmit(qid); return; }
+      if(!a.videoBlob){ showInlineWarning("Please record your response before submitting."); resumeAfterCancelledSubmit(qid); return; }
     } else {
       const el = document.getElementById("answerText");
       if(el) a.text = el.value;
-      if(!a.text || !a.text.trim()){ alert("Please enter a response before submitting."); resumeAfterCancelledSubmit(qid); return; }
+      if(!a.text || !a.text.trim()){ showInlineWarning("Please enter a response before submitting."); resumeAfterCancelledSubmit(qid); return; }
     }
 
     a.submitted = true;
@@ -1082,7 +1147,7 @@ async function startRecording(){
       }
     },1000);
   }catch(err){
-    alert("Camera/microphone access is required for this question. Please allow access and try again.");
+    showInlineWarning("Camera/microphone access is required for this question. Please allow access and try again.");
   }
 }
 
