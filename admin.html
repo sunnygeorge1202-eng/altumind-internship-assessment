@@ -3,26 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Altumind Assessment — Live Candidates</title>
+<title>Altumind Assessment — Candidate Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <style>
-  :root{ --paper:#FAFAF8; --ink:#1D211D; --slate:#565F58; --sage:#5E7C5A; --sage-dark:#456142; --line:#DEDBD0; --card:#fff; }
+  :root{ --paper:#FAFAF8; --ink:#1D211D; --slate:#565F58; --sage:#5E7C5A; --sage-dark:#456142; --line:#DEDBD0; --card:#fff; --gold:#C9A84C; }
   *{box-sizing:border-box;}
   body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--paper);color:var(--ink);}
-  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 20px;justify-content:space-between;align-items:center;}
   header h1{font-size:16px;margin:0;}
   header .count{font-size:13px;color:var(--slate);}
-  #map{height:calc(100vh - 53px);width:100%;}
+  .mode-toggle{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .mode-toggle button{
+    border:none;background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;
+    padding:8px 16px;cursor:pointer;
+  }
+  .mode-toggle button.active{background:var(--sage-dark);color:#fff;}
+  #dashboard{display:flex;flex-direction:column;height:100vh;}
+  #map{flex:1 1 auto;width:100%;}
   .gate{max-width:420px;margin:80px auto;padding:28px;background:var(--card);border:1px solid var(--line);border-radius:6px;}
-  .gate input{width:100%;padding:10px;margin:10px 0;border:1px solid var(--line);border-radius:4px;}
+  .gate input{width:100%;padding:10px;margin:10px 0;border:1px solid var(--line);border-radius:4px;box-sizing:border-box;}
   .gate button{width:100%;padding:10px;background:var(--sage-dark);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;}
   .hint{font-size:13px;color:var(--slate);}
+
+  /* Custom cluster bubbles, styled in the brand palette instead of the library's default. */
+  .altumind-cluster{
+    background:radial-gradient(circle at 30% 30%, var(--sage) 0%, var(--sage-dark) 100%);
+    border-radius:50%;color:#fff;font-weight:700;font-family:'Georgia',serif;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 4px rgba(94,124,90,0.25);
+  }
+  .altumind-pin{
+    width:16px;height:16px;border-radius:50% 50% 50% 0;
+    background:var(--gold);border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,0.4);
+    transform:rotate(-45deg);
+  }
+  #dateBar{
+    display:none;gap:8px;overflow-x:auto;padding:10px 20px;border-bottom:1px solid var(--line);
+    background:var(--card);align-items:center;
+  }
+  #dateBar.visible{display:flex;}
+  .date-pill{
+    flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink);
+    font-family:inherit;font-size:12px;font-weight:600;padding:7px 13px;border-radius:16px;cursor:pointer;
+    white-space:nowrap;
+  }
+  .date-pill .n{color:var(--slate);font-weight:400;margin-left:4px;}
+  .date-pill.active{background:var(--sage-dark);color:#fff;border-color:var(--sage-dark);}
+  .date-pill.active .n{color:rgba(255,255,255,0.8);}
 </style>
 </head>
 <body>
 
 <div id="gate" class="gate">
-  <h3>Live candidate map</h3>
+  <h3>Altumind assessment — candidate map</h3>
   <p class="hint">Enter your Apps Script Web App URL and admin key (set as ADMIN_KEY in backend.gs).</p>
   <input type="text" id="endpointInput" placeholder="https://script.google.com/macros/s/.../exec">
   <input type="text" id="keyInput" placeholder="Admin key">
@@ -31,18 +66,27 @@
 
 <div id="dashboard" style="display:none;">
   <header>
-    <h1>Altumind Assessment — Live Candidates</h1>
-    <div class="count" id="countLabel">0 currently active</div>
+    <h1>Altumind Assessment — Candidate Map</h1>
+    <div class="mode-toggle">
+      <button id="modeLive" class="active">Live now</button>
+      <button id="modeAll">All attempts</button>
+    </div>
+    <div class="count" id="countLabel">—</div>
   </header>
+  <div id="dateBar"></div>
   <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 let ENDPOINT = localStorage.getItem("altumind_admin_endpoint") || "";
 let KEY = localStorage.getItem("altumind_admin_key") || "";
-let map, markersLayer;
+let map, liveLayer, clusterLayer;
 let pollHandle;
+let mode = "live"; // "live" | "all"
+let allCandidatesCache = [];
+let selectedDate = "all"; // "all" or "YYYY-MM-DD"
 
 document.getElementById("endpointInput").value = ENDPOINT;
 document.getElementById("keyInput").value = KEY;
@@ -60,17 +104,54 @@ document.getElementById("btnConnect").onclick = ()=>{
 
 function connect(){
   document.getElementById("gate").style.display = "none";
-  document.getElementById("dashboard").style.display = "block";
+  document.getElementById("dashboard").style.display = "flex";
   map = L.map("map").setView([20.5937, 78.9629], 5); // default: India
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
-  markersLayer = L.layerGroup().addTo(map);
-  poll();
-  pollHandle = setInterval(poll, 15000);
+
+  liveLayer = L.layerGroup();
+  clusterLayer = L.markerClusterGroup({
+    iconCreateFunction: cluster => {
+      const count = cluster.getChildCount();
+      const size = count < 10 ? 34 : count < 50 ? 44 : 56;
+      return L.divIcon({
+        html: '<div class="altumind-cluster" style="width:' + size + 'px;height:' + size + 'px;font-size:' + (count<10?13:15) + 'px;">' + count + '</div>',
+        className: '', iconSize: [size, size]
+      });
+    }
+  });
+
+  document.getElementById("modeLive").onclick = ()=> switchMode("live");
+  document.getElementById("modeAll").onclick = ()=> switchMode("all");
+
+  switchMode("live");
 }
 
-async function poll(){
+function switchMode(newMode){
+  mode = newMode;
+  document.getElementById("modeLive").classList.toggle("active", mode==="live");
+  document.getElementById("modeAll").classList.toggle("active", mode==="all");
+  map.removeLayer(liveLayer);
+  map.removeLayer(clusterLayer);
+  if(pollHandle) clearInterval(pollHandle);
+
+  const dateBar = document.getElementById("dateBar");
+
+  if(mode==="live"){
+    dateBar.classList.remove("visible");
+    liveLayer.addTo(map);
+    pollLive();
+    pollHandle = setInterval(pollLive, 15000);
+  } else {
+    dateBar.classList.add("visible");
+    clusterLayer.addTo(map);
+    pollAll();
+    pollHandle = setInterval(pollAll, 30000);
+  }
+}
+
+async function pollLive(){
   try{
     const url = ENDPOINT + "?action=live&key=" + encodeURIComponent(KEY);
     const res = await fetch(url);
@@ -79,14 +160,14 @@ async function poll(){
       document.getElementById("countLabel").textContent = "Error: " + (data.error || "unknown");
       return;
     }
-    renderCandidates(data.candidates || []);
+    renderLive(data.candidates || []);
   }catch(err){
     document.getElementById("countLabel").textContent = "Connection error — retrying...";
   }
 }
 
-function renderCandidates(candidates){
-  markersLayer.clearLayers();
+function renderLive(candidates){
+  liveLayer.clearLayers();
   document.getElementById("countLabel").textContent = candidates.length + " currently active";
 
   candidates.forEach(c=>{
@@ -105,8 +186,111 @@ function renderCandidates(candidates){
       (c.city ? " (" + escapeHtml(c.city) + (c.region ? ", " + escapeHtml(c.region) : "") + ")" : "") + "<br>" +
       "Last seen: " + secsAgo + "s ago"
     );
-    marker.addTo(markersLayer);
+    marker.addTo(liveLayer);
   });
+}
+
+async function pollAll(){
+  try{
+    const url = ENDPOINT + "?action=all_locations&key=" + encodeURIComponent(KEY);
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data.ok){
+      document.getElementById("countLabel").textContent = "Error: " + (data.error || "unknown");
+      return;
+    }
+    allCandidatesCache = data.candidates || [];
+    renderDatePills(allCandidatesCache);
+    renderAll(allCandidatesCache);
+  }catch(err){
+    document.getElementById("countLabel").textContent = "Connection error — retrying...";
+  }
+}
+
+// Local (browser) YYYY-MM-DD for a timestamp — matches how a human reading
+// the popup's localized time would group sessions by "day."
+function dateKey(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function dateLabel(key){
+  const [y,m,d] = key.split("-").map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, {month:"short", day:"numeric"});
+}
+
+function renderDatePills(candidates){
+  const counts = {}; // dateKey -> session-start count
+  candidates.forEach(c=>{
+    (c.sessions || []).forEach(s=>{
+      const k = dateKey(s.timestamp);
+      counts[k] = (counts[k] || 0) + 1;
+    });
+  });
+  const keys = Object.keys(counts).sort(); // chronological
+
+  // If the previously selected date no longer has data, fall back to "all".
+  if(selectedDate !== "all" && !counts[selectedDate]) selectedDate = "all";
+
+  const totalStarts = Object.values(counts).reduce((a,b)=>a+b, 0);
+  const bar = document.getElementById("dateBar");
+  bar.innerHTML = "";
+
+  const allPill = document.createElement("button");
+  allPill.className = "date-pill" + (selectedDate==="all" ? " active" : "");
+  allPill.innerHTML = "All dates <span class=\"n\">" + totalStarts + "</span>";
+  allPill.onclick = ()=>{ selectedDate = "all"; renderDatePills(allCandidatesCache); renderAll(allCandidatesCache); };
+  bar.appendChild(allPill);
+
+  keys.forEach(k=>{
+    const pill = document.createElement("button");
+    pill.className = "date-pill" + (selectedDate===k ? " active" : "");
+    pill.innerHTML = escapeHtml(dateLabel(k)) + " <span class=\"n\">" + counts[k] + "</span>";
+    pill.onclick = ()=>{ selectedDate = k; renderDatePills(allCandidatesCache); renderAll(allCandidatesCache); };
+    bar.appendChild(pill);
+  });
+}
+
+function renderAll(candidates){
+  clusterLayer.clearLayers();
+
+  const uniqueLocations = new Set();
+  let totalSessionStarts = 0;
+  let shownCandidates = 0;
+
+  candidates.forEach(c=>{
+    if(c.lat === "" || c.lng === "" || c.lat == null || c.lng == null) return;
+
+    // When a specific date is selected, only show candidates with at least
+    // one session-start that day, and only list that day's sessions in the popup.
+    const daySessions = selectedDate === "all"
+      ? (c.sessions || [])
+      : (c.sessions || []).filter(s => dateKey(s.timestamp) === selectedDate);
+    if(selectedDate !== "all" && daySessions.length === 0) return;
+
+    shownCandidates++;
+    uniqueLocations.add(Math.round(c.lat*100)/100 + "," + Math.round(c.lng*100)/100);
+    totalSessionStarts += daySessions.length;
+
+    const icon = L.divIcon({ html: '<div class="altumind-pin"></div>', className:'', iconSize:[16,16], iconAnchor:[8,16] });
+    const marker = L.marker([parseFloat(c.lat), parseFloat(c.lng)], {icon});
+
+    const sessionsHtml = daySessions.map(s=>
+      "&bull; " + escapeHtml(s.session || "") + " — " + new Date(s.timestamp).toLocaleString()
+    ).join("<br>");
+
+    marker.bindPopup(
+      "<strong>" + escapeHtml(c.name || "Unknown") + "</strong><br>" +
+      escapeHtml(c.email || "") + "<br>" +
+      "Location: " + escapeHtml(c.locationSource || "-") +
+      (c.city ? " (" + escapeHtml(c.city) + (c.region ? ", " + escapeHtml(c.region) : "") + ")" : "") + "<br><br>" +
+      "<strong>Sessions attempted" + (selectedDate==="all" ? "" : " on " + escapeHtml(dateLabel(selectedDate))) + ":</strong><br>" + (sessionsHtml || "—")
+    );
+    clusterLayer.addLayer(marker);
+  });
+
+  document.getElementById("countLabel").textContent =
+    shownCandidates + " candidates · " + totalSessionStarts + " session starts · " + uniqueLocations.size + " distinct locations" +
+    (selectedDate==="all" ? "" : " · " + dateLabel(selectedDate));
 }
 
 function escapeHtml(s){
