@@ -591,7 +591,7 @@ function showInlineWarning(msg){
    Video-response questions are exempt — candidates need to read the
    prompt steadily while recording, without it blurring on them.
    ============================================================ */
-const IDLE_BLUR_MS = 5000;
+const IDLE_BLUR_MS = 15000;
 let idleBlurTimer = null;
 
 function armIdleBlur(){
@@ -638,6 +638,12 @@ function renderLanding(){
         <span class="pill"><span class="dot" style="background:var(--teal)"></span>Merxflo</span>
         <span class="pill"><span class="dot" style="background:var(--sage)"></span>Dronafy</span>
       </div>
+      <p class="sub" style="margin-top:18px;font-size:14px;">
+        <strong>Clinexia.AI</strong> coordinates clinical and administrative workflows for hospitals.
+        <strong>Merxflo</strong> unifies commerce and inventory systems for retail chains.
+        <strong>Dronafy</strong> brings adaptive, competency-based learning to schools and training providers.
+        Questions in this assessment draw on real problems from across these three products.
+      </p>
     </div>
   </div>
   <div class="form-wrap">
@@ -704,6 +710,7 @@ function renderInstructions(){
       — If the session timer runs out, all remaining answers are submitted automatically as they stand.<br>
       — Copy and paste are disabled for the duration of the assessment.<br>
       — Opening another browser tab or window, or switching away from this tab, will end the session immediately and submit your answers as they stand at that point.<br>
+      — If the question text on screen looks blurred, it's because the page hasn't detected any activity (mouse, scroll, keyboard, touch) for about 15 seconds — this is a routine integrity check, not an error. Move your mouse, scroll, or start typing and it clears immediately; it won't count against you.<br>
       ${state.session==="session1" ? "— This session mixes quick objective (multiple-choice) and written questions, plus one short video response (up to 90 seconds). Your browser will ask for camera and microphone permission for that question." : ""}</p>
       <label class="checkbox-row" style="margin-top:10px;">
         <input type="checkbox" id="consentCheck">
@@ -806,7 +813,20 @@ function renderQuestion(){
 /* ---------- DONE ---------- */
 function renderDone(){
   const sessionLabel = state.session==="session1" ? "Session 1 — Quantitative Ability & Communication" : "Session 2 — Behavioral Competencies";
+  const otherSessionId = state.session==="session1" ? "session2" : "session1";
   const otherSession = state.session==="session1" ? "Session 2 — Behavioral Competencies" : "Session 1 — Quantitative Ability & Communication";
+
+  // Client-side signal only (same localStorage flag used for the attempt lock):
+  // if this browser has already recorded starting the OTHER session on this
+  // email, treat the whole assessment as complete rather than inviting them
+  // to reopen a session they've already done. This can't see attempts made
+  // from a different device/browser, so it only ever upgrades the message —
+  // it never blocks anything.
+  const otherKey = state.candidate.email
+    ? "altumind_attempt_" + otherSessionId + "_" + state.candidate.email.toLowerCase()
+    : null;
+  const otherAlsoDone = otherKey && !!localStorage.getItem(otherKey);
+
   let heading = sessionLabel + ": complete";
   let message = "Your responses for this session have been recorded. You can close this window now.";
   if(state.doneReason==="tab_hidden" || state.doneReason==="window_blur"){
@@ -816,12 +836,17 @@ function renderDone(){
     heading = sessionLabel + ": time's up";
     message = "The session timer reached zero, so your remaining answers were submitted automatically as they stood.";
   }
+
+  const footer = otherAlsoDone
+    ? `<p class="hint">Both sessions are complete. You're all done — thank you for taking the time.</p>`
+    : `<p class="hint">Have ${otherSession} left to complete? <a class="plain" href="${window.location.origin}${window.location.pathname}">Reopen this link</a> to start it.</p>`;
+
   return `
   <div class="screen">
     <div class="final-note">
-      <h1>${heading}</h1>
-      <p>${message}</p>
-      <p class="hint">Have ${otherSession} left to complete? <a class="plain" href="${window.location.origin}${window.location.pathname}">Reopen this link</a> to start it.</p>
+      <h1>${otherAlsoDone ? "Assessment complete" : heading}</h1>
+      <p>${otherAlsoDone ? "You've now completed both sessions of the Altumind assessment. " + message : message}</p>
+      ${footer}
     </div>
   </div>`;
 }
@@ -1057,11 +1082,18 @@ function submitCurrentQuestion(){
       timestamp: new Date().toISOString()
     });
 
-    // Submitting a question advances straight to the next unanswered question,
-    // rather than dropping the candidate onto the review/map screen every time.
-    // The review screen is reserved for: (a) an explicit "Review" click, or
-    // (b) automatically, once every question in this session has been submitted.
-    const next = state.questions.find(x=>!(state.answers[x.id] && state.answers[x.id].submitted));
+    // Submitting a question advances to the next unanswered question AFTER the
+    // current one in sequence — not the first unanswered question overall. This
+    // way, questions the candidate has marked for review earlier in the set
+    // (e.g. Q1-Q3) don't hijack the flow when they submit Q4; they keep moving
+    // forward (Q5, Q6, ...) and only loop back to earlier review items once
+    // every later question has been submitted. The review screen is reserved
+    // for: (a) an explicit "Review" click, or (b) automatically, once every
+    // question in this session has been submitted.
+    const isUnsubmitted = x => !(state.answers[x.id] && state.answers[x.id].submitted);
+    const currentIndex = state.questions.findIndex(x=>x.id===qid);
+    const next = state.questions.slice(currentIndex+1).find(isUnsubmitted)
+              || state.questions.slice(0, currentIndex).find(isUnsubmitted);
     if(next){
       openQuestion(next.id);
     } else {
