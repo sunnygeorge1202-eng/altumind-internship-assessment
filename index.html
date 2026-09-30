@@ -51,11 +51,14 @@
   }
   .eyebrow{
     color:var(--sage-dark);
-    font-size:13px;
-    font-weight:600;
-    letter-spacing:0.02em;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.01em;
     margin-bottom:10px;
+    overflow-wrap:break-word;
+    white-space:normal;
   }
+  .required-mark{color:var(--red);margin-left:2px;}
   p{margin:0 0 1em 0;color:var(--slate);}
   .lede{font-size:16px;color:var(--slate);}
   label{display:block;font-weight:500;font-size:14px;margin-bottom:6px;color:var(--ink);}
@@ -172,7 +175,7 @@
   .rec-status.active{display:block;}
   .rec-controls{display:flex;gap:10px;margin-bottom:16px;}
 
-  .hint{font-size:13px;color:var(--slate);margin-top:-8px;margin-bottom:16px;}
+  .hint{font-size:13px;color:var(--slate);margin-top:10px;margin-bottom:16px;}
   .locked-note{
     background:#F0F3EE;border:1px solid var(--sage);color:var(--sage-dark);
     padding:10px 14px;border-radius:4px;font-size:13px;margin-bottom:16px;
@@ -240,22 +243,20 @@
 
 const ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbz_LIhmBfe1XiziKHydSuwnLqRxCQYixt7xpUFQYlpBl7lzR0xg5XSKLG9ZqshkDHHldQ/exec";
 
+const LOGO_DATA_URI = "data:image/jpeg;base64,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";
+const SUPPORT_EMAIL = "rashmi.kotagiri@altumindglobal.com";
+
 const ROLES = [
-  {id:"marketing", label:"Marketing", track:"business"},
-  {id:"sales", label:"Sales", track:"business"},
-  {id:"product_design", label:"Product Design", track:"design"},
-  {id:"full_stack", label:"Full Stack", track:"engineering"},
-  {id:"backend", label:"Backend", track:"engineering"},
-  {id:"frontend", label:"Frontend", track:"engineering"},
-  {id:"ai_coding", label:"AI Coding", track:"aicoding"}
+  {id:"marketing", label:"Marketing", category:"Business / Client-facing"},
+  {id:"sales", label:"Sales", category:"Business / Client-facing"},
+  {id:"product_design", label:"Product Design", category:"Design / Product"},
+  {id:"full_stack", label:"Full Stack", category:"Engineering"},
+  {id:"backend", label:"Backend", category:"Engineering"},
+  {id:"frontend", label:"Frontend", category:"Engineering"},
+  {id:"ai_coding", label:"AI Coding", category:"AI Coding"}
 ];
 
-const TRACK_LABELS = {
-  business:"Business / Client-facing",
-  design:"Design / Product",
-  engineering:"Engineering",
-  aicoding:"AI Coding"
-};
+const ROLE_LABELS = Object.fromEntries(ROLES.map(r=>[r.id, r.label]));
 
 // Session 1: Quantitative Ability (role-agnostic) — 14 objective (MCQ) + 6 subjective (written)
 // items, each probing a distinct thinking pattern rather than repeating the same skill.
@@ -293,49 +294,68 @@ const COMM_ITEMS = [
   {id:"C6", type:"subjective", tag:"Introduction — video", video:true, prompt:"Introduce yourself and explain, in your own words, why you're a fit for a role at an early-stage enterprise AI company. Up to 90 seconds."}
 ];
 
-// Session 2: Behavioral — full matrix, 6 competencies x 4 tracks
+// Session 2: Behavioral — full matrix, 6 competencies x 7 roles (each role gets its own
+// distinct scenario, contextualized to that role's day-to-day work).
 const BEHAVIORAL_MATRIX = {
   ownership:{
     label:"Ownership",
-    business:"A campaign you ran underperformed and no one else has noticed yet. What do you do?",
-    design:"A design decision you made shipped and is now causing user confusion, but no one has traced it back to you yet. What do you do?",
-    engineering:"You notice a process or system outside your assigned scope is clearly broken. Do you flag it, fix it, or leave it? Why?",
-    aicoding:"A model or prompt behavior you built is producing subtly wrong outputs in production, and no one else has caught it yet. What do you do?"
+    marketing:"A campaign you ran underperformed and no one else has noticed yet. What do you do?",
+    sales:"A deal you told your manager was 'basically closed' falls through. What do you do next?",
+    product_design:"A design decision you made shipped and is now causing user confusion, but no one has traced it back to you yet. What do you do?",
+    full_stack:"You notice a bug in a part of the codebase you touched weeks ago, but it's outside your current sprint. Do you flag it, fix it, or leave it? Why?",
+    backend:"You notice an API you built is silently returning stale data under certain conditions, and no one else has caught it yet. What do you do?",
+    frontend:"A UI component you shipped is now reused across the app in ways you didn't anticipate, causing inconsistent behavior elsewhere. What do you do?",
+    ai_coding:"A model or prompt behavior you built is producing subtly wrong outputs in production, and no one else has caught it yet. What do you do?"
   },
   ambiguity:{
     label:"Ambiguity Tolerance",
-    business:"A client says they want \"better engagement\" but can't define what that means. What do you do in the first conversation?",
-    design:"You're asked to \"make the assessment feel more adaptive\" with no spec. What are your first three questions before you start designing?",
-    engineering:"You're asked to \"make the assessment feel more adaptive\" with no spec. What are your first three questions before you write a line of code?",
-    aicoding:"You're told \"use AI to make this smarter\" with no defined success metric. What do you clarify before building anything?"
+    marketing:"You're asked to \"make the brand feel more premium\" with no further brief. What are your first three questions before you start?",
+    sales:"A client says they want \"better support\" but can't define what that means. What do you do in the first conversation?",
+    product_design:"You're asked to \"make the assessment feel more adaptive\" with no spec. What are your first three questions before you start designing?",
+    full_stack:"You're asked to \"make the app feel faster\" with no metrics or target given. What do you clarify before touching any code?",
+    backend:"You're told to \"make the system more scalable\" with no load numbers or growth targets given. What do you ask before starting?",
+    frontend:"You're asked to \"modernize the UI\" with no design spec or examples given. What do you clarify before writing any code?",
+    ai_coding:"You're told \"use AI to make this smarter\" with no defined success metric. What do you clarify before building anything?"
   },
   collaboration:{
     label:"Collaboration",
-    business:"A teammate on the sales side disagrees with your read of a client's real objection. How do you resolve it before the next call?",
-    design:"A developer pushes back on a design as \"not feasible\" close to a deadline. What do you do?",
-    engineering:"Two teammates disagree on the right technical approach and it's stalling a deadline. What do you do?",
-    aicoding:"A teammate wants to ship a model output you think isn't reliable enough yet. How do you handle that disagreement?"
+    marketing:"A sales teammate disagrees with the messaging you've prepared for a campaign launching tomorrow. How do you resolve it?",
+    sales:"A teammate on the sales side disagrees with your read of a client's real objection. How do you resolve it before the next call?",
+    product_design:"A developer pushes back on a design as \"not feasible\" close to a deadline. What do you do?",
+    full_stack:"You and a teammate disagree on whether a feature belongs on the frontend or backend, and it's stalling a deadline. What do you do?",
+    backend:"A frontend teammate wants an API shaped differently than you built it, and the deadline is tight. How do you resolve it?",
+    frontend:"A backend teammate delivers an API that doesn't match what was agreed, close to a deadline. What do you do?",
+    ai_coding:"A teammate wants to ship a model output you think isn't reliable enough yet. How do you handle that disagreement?"
   },
   resilience:{
     label:"Resilience",
-    business:"You pitched Merxflo to a retail chain and they went with a competitor after 3 months of effort. Walk through what you'd do next, concretely.",
-    design:"A design you were confident in tested badly with real users. Walk through what you'd do next.",
-    engineering:"You shipped a feature, and testing reveals the core logic was wrong from the start. Walk through what you'd do next.",
-    aicoding:"A model approach you spent two weeks on turns out to be fundamentally the wrong architecture. Walk through what you'd do next."
+    marketing:"A campaign you were confident about underperformed badly right after launch. Walk through what you'd do next, concretely.",
+    sales:"You pitched Merxflo to a retail chain and they went with a competitor after 3 months of effort. Walk through what you'd do next, concretely.",
+    product_design:"A design you were confident in tested badly with real users. Walk through what you'd do next.",
+    full_stack:"You shipped a feature end-to-end, and testing reveals the core logic was wrong from the start. Walk through what you'd do next.",
+    backend:"A system you built and thought was solid goes down under real production load in its first week. Walk through what you'd do next.",
+    frontend:"A UI flow you built tests badly with real users right after launch. Walk through what you'd do next.",
+    ai_coding:"A model approach you spent two weeks on turns out to be fundamentally the wrong architecture. Walk through what you'd do next."
   },
   detail:{
     label:"Attention to Detail",
-    business:"You're drafting a client proposal and notice the pricing sheet has a typo just before sending. What's your process here?",
-    design:"You're about to ship a flow and notice an edge case that breaks it for a small subset of users. What's your process here?",
-    engineering:"You find a subtle bug in a scoring pipeline that's been live for 2 weeks and may have affected past results. What do you do?",
-    aicoding:"You notice your evaluation set for a model has a subtle bias that's been inflating accuracy numbers for weeks. What do you do?"
+    marketing:"You're about to publish an ad campaign and notice a factual error in the copy just before it goes live. What's your process here?",
+    sales:"You're drafting a client proposal and notice the pricing sheet has a typo just before sending. What's your process here?",
+    product_design:"You're about to ship a flow and notice an edge case that breaks it for a small subset of users. What's your process here?",
+    full_stack:"You're about to merge a pull request and notice a subtle off-by-one bug in a shared utility function. What's your process here?",
+    backend:"You find a subtle bug in a scoring pipeline that's been live for 2 weeks and may have affected past results. What do you do?",
+    frontend:"You notice a form field silently accepts invalid input that later breaks a downstream feature. What's your process here?",
+    ai_coding:"You notice your evaluation set for a model has a subtle bias that's been inflating accuracy numbers for weeks. What do you do?"
   },
   empathy:{
     label:"Customer Empathy",
-    business:"A landing-page test for a new Merxflo feature got 40 sign-ups in a week. The founder wants to greenlight full build. What questions would you ask before agreeing?",
-    design:"Users say they \"love\" a new Dronafy feature in interviews, but usage data shows no one has repeated it after first use. What's your read?",
-    engineering:"A stakeholder wants to fast-track building a feature based on one enthusiastic customer email. What would you want to know first?",
-    aicoding:"A demo of an AI feature gets a great reaction in a meeting. What would you check before treating that as validation?"
+    marketing:"A campaign got strong click-through rates in its first week, and leadership wants to double down immediately. What questions would you ask before agreeing?",
+    sales:"A landing-page test for a new Merxflo feature got 40 sign-ups in a week. The founder wants to greenlight full build. What questions would you ask before agreeing?",
+    product_design:"Users say they \"love\" a new Dronafy feature in interviews, but usage data shows no one has repeated it after first use. What's your read?",
+    full_stack:"A stakeholder wants to fast-track building a feature end-to-end based on one enthusiastic customer email. What would you want to know first?",
+    backend:"A stakeholder wants to fast-track a backend change based on one customer's urgent complaint. What would you want to know first?",
+    frontend:"A stakeholder wants to fast-track a UI change based on one customer's vocal complaint in a support ticket. What would you want to know first?",
+    ai_coding:"A demo of an AI feature gets a great reaction in a meeting. What would you check before treating that as validation?"
   }
 };
 
@@ -388,16 +408,16 @@ function buildSession1Questions(){
 }
 
 function buildSession2Questions(roleIds){
-  const tracks = [...new Set(roleIds.map(rid => ROLES.find(r=>r.id===rid).track))];
   const qs = [];
-  tracks.forEach(track=>{
+  roleIds.forEach(roleId=>{
+    const roleLabel = ROLE_LABELS[roleId] || roleId;
     Object.entries(BEHAVIORAL_MATRIX).forEach(([key, comp])=>{
       qs.push({
-        id: track + "_" + key,
-        tag: comp.label + " — " + TRACK_LABELS[track],
+        id: roleId + "_" + key,
+        tag: comp.label + " — " + roleLabel,
         video:false,
-        prompt: comp[track],
-        section:"Behavioral — " + TRACK_LABELS[track]
+        prompt: comp[roleId],
+        section:"Behavioral — " + roleLabel
       });
     });
   });
@@ -610,7 +630,7 @@ function renderLanding(){
   return `
   <div class="hero">
     <div class="hero-inner">
-      <div class="hero-mark">Altumind</div>
+      <img src="${LOGO_DATA_URI}" alt="Altumind" style="height:44px;margin-bottom:22px;display:block;">
       <h1>Show us how you think.</h1>
       <p class="sub">This is round one — a chance to think out loud on real problems from the products you'd actually be working on. No trick questions, just how you reason.</p>
       <div class="pills">
@@ -623,11 +643,11 @@ function renderLanding(){
   <div class="form-wrap">
     <p class="lede">This assessment is split into two independent sessions. You can complete them in separate sittings — this link works for either. <strong>Each session can only be started once</strong>, so make sure you're ready before you begin.</p>
     <div class="card">
-      <label for="fname">Full name</label>
+      <label for="fname">Full name<span class="required-mark">*</span></label>
       <input type="text" id="fname" value="${state.candidate.name}">
-      <label for="femail">Email</label>
+      <label for="femail">Email<span class="required-mark">*</span></label>
       <input type="email" id="femail" value="${state.candidate.email}">
-      <label for="fsession">Which session are you starting?</label>
+      <label for="fsession">Which session are you starting?<span class="required-mark">*</span></label>
       <select id="fsession">
         <option value="">Select a session</option>
         <option value="session1">Session 1 — Quantitative Ability &amp; Communication (60 min)</option>
@@ -638,6 +658,7 @@ function renderLanding(){
         <button class="btn-primary" id="btnStart">Continue</button>
       </div>
     </div>
+    <p class="hint">Facing an issue while taking this assessment? Contact <a class="plain" href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>
   </div>`;
 }
 
@@ -648,14 +669,14 @@ function renderRoles(){
       <input type="checkbox" value="${r.id}" ${state.selectedRoles.includes(r.id)?"checked":""}>
       <span>
         <div class="role-label">${r.label}</div>
-        <div class="role-track">${TRACK_LABELS[r.track]}</div>
+        <div class="role-track">${r.category}</div>
       </span>
     </label>`).join("");
   return `
   <div class="screen">
     <div class="eyebrow">Session 2 — Behavioral Competencies</div>
     <h1>Which role(s) are you applying for?</h1>
-    <p class="lede">Select all that apply. Every competency will be assessed, contextualized to the role area(s) you choose. If your roles span more than one area, you'll complete a scenario set for each area.</p>
+    <p class="lede">Select all that apply. Every competency will be assessed with scenarios written specifically for each role you choose. If you select more than one role, you'll complete a full scenario set for each.</p>
     <div class="card">
       ${rows}
       <div class="btn-row">
@@ -714,8 +735,8 @@ function renderMap(){
     <div class="timer ${state.globalTimeLeft<300?'low':''}" id="globalTimerDisplay">${fmtTime(state.globalTimeLeft)}</div>
   </div>
   <div class="screen">
-    <h2>Question overview</h2>
-    <p>Click any unlocked question to continue. Submitted questions are locked.</p>
+    <h2>${allSubmitted ? "Review before you finish" : "Question overview"}</h2>
+    <p>${allSubmitted ? "Every question has been submitted. You can close this screen and finish whenever you're ready." : "Click any unlocked question to continue. Submitted questions are locked."}</p>
     <div class="qmap-legend">
       <span><span class="dot-swatch" style="background:var(--card);border:1px solid var(--line)"></span> Not started</span>
       <span><span class="dot-swatch" style="background:#F4E9D8;border:1px solid var(--amber)"></span> In progress</span>
@@ -784,13 +805,15 @@ function renderQuestion(){
 
 /* ---------- DONE ---------- */
 function renderDone(){
-  let heading = "Session complete";
+  const sessionLabel = state.session==="session1" ? "Session 1 — Quantitative Ability & Communication" : "Session 2 — Behavioral Competencies";
+  const otherSession = state.session==="session1" ? "Session 2 — Behavioral Competencies" : "Session 1 — Quantitative Ability & Communication";
+  let heading = sessionLabel + ": complete";
   let message = "Your responses for this session have been recorded. You can close this window now.";
   if(state.doneReason==="tab_hidden" || state.doneReason==="window_blur"){
-    heading = "Assessment ended";
+    heading = sessionLabel + ": ended";
     message = "This session was ended automatically because another browser tab or window was opened, or you navigated away from this tab. Your answers were submitted as they stood at that moment.";
   } else if(state.doneReason==="time_limit"){
-    heading = "Time's up";
+    heading = sessionLabel + ": time's up";
     message = "The session timer reached zero, so your remaining answers were submitted automatically as they stood.";
   }
   return `
@@ -798,7 +821,7 @@ function renderDone(){
     <div class="final-note">
       <h1>${heading}</h1>
       <p>${message}</p>
-      <p class="hint">If you have another session to complete, reopen this link.</p>
+      <p class="hint">Have ${otherSession} left to complete? <a class="plain" href="${window.location.origin}${window.location.pathname}">Reopen this link</a> to start it.</p>
     </div>
   </div>`;
 }
@@ -817,6 +840,8 @@ function bindEvents(){
       const errEl = $("landingError");
       errEl.style.display = "none";
       if(!name || !email || !session){ showInlineWarning("Please fill in your name, email, and select a session."); return; }
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if(!EMAIL_RE.test(email)){ showInlineWarning("Please enter a valid email address (e.g. name@example.com)."); return; }
 
       const localKey = "altumind_attempt_" + session + "_" + email.toLowerCase();
       if(localStorage.getItem(localKey)){
@@ -1032,8 +1057,17 @@ function submitCurrentQuestion(){
       timestamp: new Date().toISOString()
     });
 
-    state.screen = "map";
-    render();
+    // Submitting a question advances straight to the next unanswered question,
+    // rather than dropping the candidate onto the review/map screen every time.
+    // The review screen is reserved for: (a) an explicit "Review" click, or
+    // (b) automatically, once every question in this session has been submitted.
+    const next = state.questions.find(x=>!(state.answers[x.id] && state.answers[x.id].submitted));
+    if(next){
+      openQuestion(next.id);
+    } else {
+      state.screen = "map";
+      render();
+    }
   });
 }
 
