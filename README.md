@@ -53,4 +53,10 @@
 - **Single attempt per session:** once a candidate starts a session, that email + session combination is permanently locked (checked against the Sessions sheet via a `check_attempt` backend call before they're allowed to proceed past the landing page, backed up by a local browser flag for instant feedback). They cannot restart, even in a new browser or incognito window, as long as the email matches.
 - **Live map link is separate and not linked anywhere in the candidate app** (`admin.html`) — candidates have no path to it from `index.html`.
 
+## Scheduled start and entry window
+- `TEST_START` and `ENTRY_WINDOW_MINUTES` at the top of `backend.gs` set when the test opens and how long candidates have to get in (currently 4:00 PM IST on 29 Oct 2026, 10 minutes). **Update `TEST_START` and redeploy before each new test slot.**
+- The landing page shows a countdown to opening, then a countdown to entry closing; Continue is disabled outside the window. The backend enforces the same window in `check_attempt` using the server's clock, so changing the candidate's computer clock doesn't help.
+- Anyone who gets past the landing page inside the window still gets their full session time.
+- A `session_start` that arrives after the window (e.g. someone who got in at 4:09 but sat on the instructions screen) isn't blocked, but is logged in the Sessions sheet as `started (outside entry window)`.
+
 **Important consequence:** combined with the earlier no-resume limitation, if a candidate's browser crashes, their network drops, or they accidentally close the tab mid-session, **they cannot get back in** — the Sessions sheet already has a "started" row for their email, so `check_attempt` will block them. You'll need a manual override path — the simplest is deleting or editing that candidate's row in the `Sessions` tab yourself if a legitimate technical failure happens and they need a second chance. Worth deciding this policy before candidates start using it, since there's no in-app way for a candidate to self-recover.

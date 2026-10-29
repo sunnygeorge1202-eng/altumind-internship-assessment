@@ -437,19 +437,95 @@ function sendToBackend(payload){
   }).catch(err=>console.warn("Save failed, will retry on final submit", err));
 }
 
-// Authoritative one-attempt-per-session check against the backend. Returns true if this
+// Authoritative entry check against the backend: whether the entry window is open
+// (status "not_open" | "open" | "closed", per the server's clock) and whether this
 // candidate has already started (or completed) this session, per the Sessions sheet.
-async function checkAttemptUsed(email, session){
-  if(ENDPOINT_URL.indexOf("REPLACE_WITH") === 0) return false; // can't check before backend is configured
+// Returns {} if the check couldn't be made.
+async function checkAttempt(email, session){
+  if(ENDPOINT_URL.indexOf("REPLACE_WITH") === 0) return {}; // can't check before backend is configured
   try{
     const url = ENDPOINT_URL + "?action=check_attempt&email=" + encodeURIComponent(email) + "&session=" + encodeURIComponent(session);
     const res = await fetch(url);
     const data = await res.json();
-    return !!(data && data.alreadyUsed);
+    return data || {};
   }catch(err){
     console.warn("Attempt check failed, allowing candidate through:", err);
-    return false; // fail open rather than blocking a legitimate candidate on a network hiccup
+    return {}; // fail open rather than blocking a legitimate candidate on a network hiccup
   }
+}
+
+/* ============================================================
+   ENTRY WINDOW — the test opens at a set time and entry closes a few
+   minutes later (TEST_START / ENTRY_WINDOW_MINUTES in backend.gs). The
+   landing page shows a countdown and disables Continue outside the window;
+   the backend enforces the same window in check_attempt.
+   ============================================================ */
+let entryWindow = null;       // {opensAt, closesAt, serverOffsetMs} — epoch ms, offset corrects the local clock
+let entryWindowTicker = null;
+let landingChecking = false;  // true while Continue is waiting on check_attempt
+
+function setEntryWindow(data){
+  if(!data || !data.opensAt || !data.closesAt || !data.serverNow) return;
+  entryWindow = {opensAt:data.opensAt, closesAt:data.closesAt, serverOffsetMs:data.serverNow - Date.now()};
+}
+
+async function fetchEntryWindow(){
+  if(ENDPOINT_URL.indexOf("REPLACE_WITH") === 0) return;
+  try{
+    const res = await fetch(ENDPOINT_URL + "?action=window");
+    const data = await res.json();
+    if(data && data.ok) setEntryWindow(data);
+  }catch(err){
+    console.warn("Entry window lookup failed:", err);
+  }
+  updateScheduleNote();
+}
+
+function entryWindowStatus(){
+  if(!entryWindow) return null;
+  const now = Date.now() + entryWindow.serverOffsetMs;
+  if(now < entryWindow.opensAt) return "not_open";
+  if(now < entryWindow.closesAt) return "open";
+  return "closed";
+}
+
+function formatIST(ms){
+  return new Date(ms).toLocaleTimeString("en-IN", {timeZone:"Asia/Kolkata", hour:"numeric", minute:"2-digit", hour12:true}).toUpperCase() + " IST";
+}
+
+function formatCountdown(ms){
+  const total = Math.max(0, Math.ceil(ms/1000));
+  const h = Math.floor(total/3600), m = Math.floor((total%3600)/60), s = total%60;
+  const mmss = String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+  return h > 0 ? h + ":" + mmss : mmss;
+}
+
+function updateScheduleNote(){
+  const note = document.getElementById("scheduleNote");
+  const btn = document.getElementById("btnStart");
+  if(!note || !btn){
+    if(entryWindowTicker){ clearInterval(entryWindowTicker); entryWindowTicker = null; }
+    return;
+  }
+  const status = entryWindowStatus();
+  if(!status){ note.style.display = "none"; return; }
+
+  const now = Date.now() + entryWindow.serverOffsetMs;
+  if(status === "not_open"){
+    note.innerHTML = "The assessment opens at <strong>" + formatIST(entryWindow.opensAt) + "</strong> — starts in <strong>" + formatCountdown(entryWindow.opensAt - now) + "</strong>. You can fill in your details now. Entry closes at " + formatIST(entryWindow.closesAt) + ".";
+  } else if(status === "open"){
+    note.innerHTML = "Entry is open until <strong>" + formatIST(entryWindow.closesAt) + "</strong> (closes in <strong>" + formatCountdown(entryWindow.closesAt - now) + "</strong>). Once you start, you get the full session time.";
+  } else {
+    note.innerHTML = "The entry window for this assessment closed at <strong>" + formatIST(entryWindow.closesAt) + "</strong>. If you believe this is an error, contact <a class=\"plain\" href=\"mailto:" + SUPPORT_EMAIL + "\">" + SUPPORT_EMAIL + "</a>.";
+  }
+  note.style.display = "block";
+  if(!landingChecking) btn.disabled = status !== "open";
+}
+
+function startEntryWindowTicker(){
+  if(entryWindowTicker) clearInterval(entryWindowTicker);
+  updateScheduleNote();
+  entryWindowTicker = setInterval(updateScheduleNote, 1000);
 }
 
 function blobToBase64(blob){
@@ -648,6 +724,7 @@ function renderLanding(){
   </div>
   <div class="form-wrap">
     <p class="lede">This assessment is split into two independent sessions. You can complete them in separate sittings — this link works for either. <strong>Each session can only be started once</strong>, so make sure you're ready before you begin.</p>
+    <div id="scheduleNote" class="locked-note" style="display:none;"></div>
     <div class="card">
       <label for="fname">Full name<span class="required-mark">*</span></label>
       <input type="text" id="fname" value="${state.candidate.name}">
@@ -858,6 +935,7 @@ function bindEvents(){
   const $ = id => document.getElementById(id);
 
   if(state.screen==="landing"){
+    startEntryWindowTicker();
     $("btnStart").onclick = async ()=>{
       const name = $("fname").value.trim();
       const email = $("femail").value.trim();
@@ -875,13 +953,28 @@ function bindEvents(){
         return;
       }
 
+      landingChecking = true;
       $("btnStart").disabled = true;
       $("btnStart").textContent = "Checking...";
-      const already = await checkAttemptUsed(email, session);
+      const check = await checkAttempt(email, session);
+      landingChecking = false;
       $("btnStart").disabled = false;
       $("btnStart").textContent = "Continue";
+      setEntryWindow(check);
+      updateScheduleNote();
 
-      if(already){
+      if(check.status === "not_open"){
+        errEl.textContent = "The assessment hasn't opened yet. Please wait until " + formatIST(check.opensAt) + ".";
+        errEl.style.display = "block";
+        return;
+      }
+      if(check.status === "closed"){
+        errEl.textContent = "The entry window for this assessment has closed. If you believe this is an error, contact " + SUPPORT_EMAIL + ".";
+        errEl.style.display = "block";
+        return;
+      }
+
+      if(check.alreadyUsed){
         localStorage.setItem(localKey, "1");
         errEl.textContent = "This session has already been started or completed for this email. Each session can only be attempted once. If you believe this is an error, contact Altumind.";
         errEl.style.display = "block";
@@ -1227,6 +1320,7 @@ function stopRecording(){
    INIT
    ============================================================ */
 render();
+fetchEntryWindow();
 </script>
 </body>
 </html>

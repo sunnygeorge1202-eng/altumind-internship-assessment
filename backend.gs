@@ -22,6 +22,13 @@ const RESPONSES_TAB = "Responses";
 const SESSIONS_TAB = "Sessions";
 const LIVE_TAB = "Live";
 
+// Test schedule. Candidates can only get past the landing page between TEST_START and
+// TEST_START + ENTRY_WINDOW_MINUTES (checked against this server's clock, so changing
+// the candidate's computer clock doesn't help). Anyone who got in during the window
+// still gets their full session time. Update TEST_START for each new test slot.
+const TEST_START = "2026-10-29T16:00:00+05:30"; // 4:00 PM IST
+const ENTRY_WINDOW_MINUTES = 10;
+
 // A candidate is treated as "currently logged in" for the live map if their most
 // recent heartbeat is within this many seconds. Heartbeats are sent every 20s from
 // the app, so 60s tolerates one or two missed pings before dropping them from the map.
@@ -33,7 +40,10 @@ function doPost(e){
     const ss = SpreadsheetApp.openById(SHEET_ID);
 
     if(data.type === "session_start"){
-      logSessionEvent(ss, data, "started");
+      // Not rejected (the app can't read POST responses), but flagged so a late start
+      // that slipped past the landing check is visible in the Sessions sheet.
+      const inWindow = getEntryWindow().status === "open";
+      logSessionEvent(ss, data, inWindow ? "started" : "started (outside entry window)");
       upsertLive(ss, data);
     } else if(data.type === "session_complete" || data.type === "session_complete_autotimeout"){
       const status = data.type === "session_complete_autotimeout"
@@ -70,12 +80,28 @@ function doGet(e){
     const rows = getLiveRows(ss);
     return jsonOutput({ok:true, candidates:rows});
   }
+  if(params.action === "window"){
+    return jsonOutput(Object.assign({ok:true}, getEntryWindow()));
+  }
   if(params.action === "check_attempt"){
+    const win = getEntryWindow();
+    if(win.status !== "open"){
+      return jsonOutput(Object.assign({ok:true, alreadyUsed:false}, win));
+    }
     const ss = SpreadsheetApp.openById(SHEET_ID);
     const used = hasExistingAttempt(ss, params.email, params.session);
-    return jsonOutput({ok:true, alreadyUsed:used});
+    return jsonOutput(Object.assign({ok:true, alreadyUsed:used}, win));
   }
   return ContentService.createTextOutput("Altumind assessment backend is live.");
+}
+
+/** Where "now" falls relative to the entry window: "not_open" | "open" | "closed". Times are epoch ms. */
+function getEntryWindow(){
+  const opensAt = new Date(TEST_START).getTime();
+  const closesAt = opensAt + ENTRY_WINDOW_MINUTES * 60 * 1000;
+  const now = new Date().getTime();
+  const status = now < opensAt ? "not_open" : (now < closesAt ? "open" : "closed");
+  return {status:status, opensAt:opensAt, closesAt:closesAt, serverNow:now};
 }
 
 /** Returns true if this email has any logged Sessions row (started or completed) for this session. */
