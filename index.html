@@ -400,10 +400,21 @@ function fmtTime(sec){
   return m + ":" + String(s).padStart(2,"0");
 }
 
+// Fisher–Yates shuffle; returns a new array so the source lists stay in their original order.
+function shuffled(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Sections stay in a fixed order; questions are shuffled within each section per candidate.
 function buildSession1Questions(){
   return [
-    ...QUANT_ITEMS.map(q=>({...q, section:"Quantitative Ability"})),
-    ...COMM_ITEMS.map(q=>({...q, section:"Communication"}))
+    ...shuffled(QUANT_ITEMS).map(q=>({...q, section:"Quantitative Ability"})),
+    ...shuffled(COMM_ITEMS).map(q=>({...q, section:"Communication"}))
   ];
 }
 
@@ -411,7 +422,7 @@ function buildSession2Questions(roleIds){
   const qs = [];
   roleIds.forEach(roleId=>{
     const roleLabel = ROLE_LABELS[roleId] || roleId;
-    Object.entries(BEHAVIORAL_MATRIX).forEach(([key, comp])=>{
+    shuffled(Object.entries(BEHAVIORAL_MATRIX)).forEach(([key, comp])=>{
       qs.push({
         id: roleId + "_" + key,
         tag: comp.label + " — " + roleLabel,

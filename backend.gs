@@ -25,8 +25,10 @@ const LIVE_TAB = "Live";
 // Test schedule. Candidates can only get past the landing page between TEST_START and
 // TEST_START + ENTRY_WINDOW_MINUTES (checked against this server's clock, so changing
 // the candidate's computer clock doesn't help). Anyone who got in during the window
-// still gets their full session time. Update TEST_START for each new test slot.
-const TEST_START = "2026-10-29T16:00:00+05:30"; // 4:00 PM IST
+// still gets their full session time. Update TEST_START for each new test slot, or
+// set it to "" to turn the window off (the test is then open at any time).
+// e.g. "2026-10-29T16:00:00+05:30" for 4:00 PM IST.
+const TEST_START = "";
 const ENTRY_WINDOW_MINUTES = 10;
 
 // A candidate is treated as "currently logged in" for the live map if their most
@@ -97,6 +99,7 @@ function doGet(e){
 
 /** Where "now" falls relative to the entry window: "not_open" | "open" | "closed". Times are epoch ms. */
 function getEntryWindow(){
+  if(!TEST_START) return {status:"open"}; // window turned off — no times, so the app shows no countdown
   const opensAt = new Date(TEST_START).getTime();
   const closesAt = opensAt + ENTRY_WINDOW_MINUTES * 60 * 1000;
   const now = new Date().getTime();
